@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: globeco-benchmark-coordinator
+  namespace: globeco
+  labels:
+    app: globeco-benchmark-coordinator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: globeco-benchmark-coordinator
+  template:
+    metadata:
+      labels:
+        app: globeco-benchmark-coordinator
+    spec:
+      containers:
+      - name: globeco-benchmark-coordinator
+        image: kasbench/globeco-benchmark-coordinator:latest
+        ports:
+        - containerPort: 8089
+          name: http
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8089
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8089
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+      - name: locust-exporter
+        image: containersol/locust_exporter:latest
+        ports:
+        - containerPort: 9646
+          name: metrics
+        env:
+        - name: locust.uri
+          value: "http://localhost:8089"
+        - name: locust.timeout
+          value: "5s"
+        - name: web.listen-address
+          value: ":9646"
+        - name: web.telemetry-path
+          value: "/metrics"
+        - name: log.level
+          value: "info"
+        - name: log.format
+          value: "logger:stderr"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 9646
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: 9646
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+      restartPolicy: Always
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 1000 
