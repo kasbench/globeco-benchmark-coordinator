@@ -2,34 +2,22 @@
 .git
 .gitignore
 
-# Python
-__pycache__
+# Documentation
+README.md
+LICENSE
+documentation/
+
+# Build artifacts
 *.pyc
+__pycache__/
 *.pyo
 *.pyd
 .Python
-env
+env/
+venv/
+.venv/
 pip-log.txt
 pip-delete-this-directory.txt
-.tox
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git
-.mypy_cache
-.pytest_cache
-.hypothesis
-
-# Virtual environments
-.venv
-venv/
-ENV/
-env.bak/
-venv.bak/
 
 # IDE
 .vscode/
@@ -47,13 +35,24 @@ venv.bak/
 ehthumbs.db
 Thumbs.db
 
-# Documentation
-documentation/
-README.md
-LICENSE
+# Logs
+*.log
 
-# Notebooks (not needed in container)
+# Temporary files
+*.tmp
+*.temp
+
+# Jupyter notebooks (if not needed in container)
+*.ipynb
 notebooks/
 
-# Other
-*.log 
+# Kubernetes files
+k8s/
+
+# Build scripts
+build.sh
+kbuild.sh
+
+# Docker files (except Dockerfile)
+docker-compose*.yml
+docker-compose*.yaml 

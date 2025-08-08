@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  globeco-benchmark-coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      cache_from:
+        - globeco-benchmark-coordinator:cache
+      cache_to:
+        - globeco-benchmark-coordinator:cache,mode=max
+    image: globeco-benchmark-coordinator:latest
+    ports:
+      - "8089:8089"
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - globeco-network
+
+  # Alternative Alpine-based service
+  globeco-benchmark-coordinator-alpine:
+    build:
+      context: .
+      dockerfile: Dockerfile.alpine
+      cache_from:
+        - globeco-benchmark-coordinator-alpine:cache
+      cache_to:
+        - globeco-benchmark-coordinator-alpine:cache,mode=max
+    image: globeco-benchmark-coordinator:alpine
+    ports:
+      - "8090:8089"
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - globeco-network
+
+networks:
+  globeco-network:
+    driver: bridge

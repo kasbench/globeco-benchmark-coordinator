@@ -1,0 +1,36 @@
+# Alternative: Alpine-based image for faster builds
+FROM python:3.13-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    curl \
+    iputils \
+    busybox-extras \
+    wget \
+    ca-certificates
+
+# Install UV
+RUN pip install uv
+
+# Set working directory
+WORKDIR /app
+
+# Copy UV configuration files first (these change less frequently)
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies using UV
+RUN uv sync --frozen
+
+# Copy the entire locust directory (this changes more frequently)
+COPY locust/ ./locust/ 
+
+# Create a non-root user for security
+RUN adduser -D -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8089
+
+# Change to locust directory and set the default command to run locust
+WORKDIR /app/locust
+ENV PYTHONPATH=/app/locust
+CMD ["uv", "run", "locust", "-f", "scripts", "--host=http://globeco-portfolio-management-portal:3000"]

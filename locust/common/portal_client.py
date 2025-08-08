@@ -1,6 +1,9 @@
+from locust import HttpUser
 import requests
 import json
 import random
+import common.portal_client as portal_client
+
 
 base = "http://globeco.local:31510"
 
@@ -21,16 +24,16 @@ def random_integer(min:int=0, max:int=1_000_000_000_000 ) -> int:
 
 # Portfolio Functions
 
-def get_portfolios(base:str) -> requests.Response:
-    portfolios = f"{base}/api/portfolios"
-    response = requests.get(portfolios)
+def get_portfolios(client:HttpUser) -> requests.Response:
+    portfolios = f"/api/portfolios"
+    response = client.get(portfolios, name="/api/portfolios")
     return response
 
 
-def post_portfolios(base:str, data:json) -> requests.Response:
-    portfolios = f"{base}/api/portfolios"
-    response = requests.post(portfolios, json=data)
-    return response
+# def post_portfolios(base:str, data:json) -> requests.Response:
+#     portfolios = f"{base}/api/portfolios"
+#     response = requests.post(portfolios, json=data)
+#     return response
 
 
 def get_portfolio(base:str, id:str) -> requests.Response:
@@ -45,9 +48,28 @@ def put_portfolios(base:str, id:str, data:json) -> requests.Response:
     return response
 
 
-def delete_portfolios(base:str, id:str, version:int) -> requests.Response:
-    portfolios = f"{base}/api/portfolios/{id}?version={version}"
-    response = requests.delete(portfolios)
+# def delete_portfolios(base:str, id:str, version:int) -> requests.Response:
+#     portfolios = f"{base}/api/portfolios/{id}?version={version}"
+#     response = requests.delete(portfolios)
+#     return response
+
+
+def post_portfolios(client:HttpUser, data:dict) -> requests.Response:
+    portfolios = f"/api/portfolios"
+    response = client.post(portfolios, json.dumps(data), name="/api/portfolios")
+    return response
+
+def delete_portfolios(client:HttpUser, id:str, version:int) -> requests.Response:
+    portfolios = f"/api/portfolios/{id}?version={version}"
+    response = client.delete(portfolios, name="/api/portfolios")
+    return response
+
+
+# Security Functions
+
+def get_securities(base:str) -> requests.Response:
+    securities = f"{base}/api/v1/securities"
+    response = requests.get(securities)
     return response
 
 
@@ -81,6 +103,12 @@ def delete_investment_model(base:str, id:str, version:int) -> requests.Response:
     model = f"{base}/api/models/{id}?version={version}"
     response = requests.delete(model)
     return response 
+
+def rebalance_investment_model(client:HttpUser, id:str) -> requests.Response:
+    model = f"/api/models/{id}/rebalance"
+    response = client.post(model, name="/api/models/{id}/rebalance")
+    return response
+
 
 
 # Order Functions
@@ -119,9 +147,9 @@ def delete_orders(base:str, id:str, version:int) -> requests.Response:
     return response
 
 
-def submit_order(base:str, data:json) -> requests.Response:
-    orders = f"{base}/api/orders/batch/submit"
-    response = requests.post(orders, json=data)
+def submit_order(client:HttpUser, data:json) -> requests.Response:
+    orders = f"/api/orders/batch/submit"
+    response = client.post(orders, json=data, name="/api/orders/batch/submit")
     return response
 
 
