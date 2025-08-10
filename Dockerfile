@@ -82,4 +82,4 @@ EXPOSE 8089
 # Change to locust directory and set the default command to run locust
 WORKDIR /app/locust
 ENV PYTHONPATH=/app/locust
-CMD ["uv", "run", "locust", "-f", "scripts", "--host=http://globeco-portfolio-management-portal:3000"] 
+CMD ["uv", "run", "locust", "-f", "./scripts", "--host=http://globeco-portfolio-management-portal:3000"] 

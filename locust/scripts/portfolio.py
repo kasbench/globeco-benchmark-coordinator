@@ -14,14 +14,17 @@ class PortfolioUser(HttpUser):
     @task
     def get_portfolio(self):
         portfolio_id = sample(self.portfolio_ids, 1)[0]
+        print(f"PortfolioUser: Getting portfolio: {portfolio_id}")
         response = self.client.get(f"/api/portfolios/{portfolio_id}", name="get_portfolio")
         if not response.ok:
             print(f"Failed to get portfolio: {response.status_code} {response.reason}")
             print(response.text)
-        time.sleep(1)
-
+        
+        
     def on_start(self):
+        print("PortfolioUser: On start")
         while not self.portfolio_ids:
+            print("PortfolioUser: Getting portfolios")
             response = self.client.get ("/api/portfolios", name="get_portfolios")
             if response.ok:
                 portfolios = response.json()

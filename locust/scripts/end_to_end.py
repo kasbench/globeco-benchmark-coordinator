@@ -64,7 +64,7 @@ def create_cash_transaction(portfolio_id: int) -> list[dict]:
     
     return transaction
 
-def post_transactions(transactions, max_post=50, url='http://globeco-portfolio-accounting-service:8087/api/v1'):
+def post_transactions(client, transactions, max_post=50, url='http://globeco-portfolio-accounting-service:8087/api/v1'):
     """
     Post transactions to the portfolio accounting service.  This should be changed to use the portal client.
     """
@@ -88,7 +88,7 @@ def post_transactions(transactions, max_post=50, url='http://globeco-portfolio-a
 
         # print('Posting: ', [json.dumps(s) for s in sub_transactions])
         
-        response = requests.post(url + "/transactions", headers=headers, json=sub_transactions)
+        response = client.post( "/api/transactions",  json=sub_transactions)
         if response.ok:
             data = response.json() 
             # print("data: ", data)
@@ -100,6 +100,7 @@ def post_transactions(transactions, max_post=50, url='http://globeco-portfolio-a
         else:
             print(f"Error (POST): {response.status_code}, {response.reason}")
 
+    
 
 def split_portfolios_randomly(portfolios, num_portfolios_per_model):
     """
@@ -209,7 +210,7 @@ class EndToEndUser(HttpUser):
             funded_portfolios = []
             for portfolio_id in portfolio_ids:
                 cash_transaction = create_cash_transaction(portfolio_id)
-                total_requested, successful, failed, results = post_transactions([cash_transaction])
+                total_requested, successful, failed, results = post_transactions(self.client, [cash_transaction])
                 if successful > 0:
                     funded_portfolios.append(portfolio_id)
                 else:
@@ -224,7 +225,7 @@ class EndToEndUser(HttpUser):
     def create_models_for_portfolios(self):
         print("Creating models")
         try:
-            portfolio_ids = self.cash_portfolio_queue.get(timeout=1)
+            portfolio_ids = self.cash_portfolio_queue.get(timeout=0.01)
             model_id = str(uuid.uuid4())
             response = create_models(self.client, self.securities, portfolio_ids, POSITIONS_PER_MODEL, len(portfolio_ids), 1)
             if response:
