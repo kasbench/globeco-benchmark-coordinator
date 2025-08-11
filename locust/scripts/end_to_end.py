@@ -127,9 +127,9 @@ def post_model(client, name, positions, portfolios, url='http://globeco-order-ge
         "positions": positions,
         "portfolios": portfolios}
     headers = {'Content-Type': 'application/json'}
-    print(f"Posting model: {payload}")
+    # print(f"Posting model: {payload}")
     response = client.post("/api/models", json=payload, name="/api/models")
-    print(f"Response: {response}")
+    # print(f"Response: {response}")
     if response.ok:
         return response.json()
     else:
@@ -170,7 +170,7 @@ def create_models(client, securities, portfolios, num_positions_per_model, num_p
 
 
 class EndToEndUser(HttpUser):
-    wait_time = between(1, 5)
+    wait_time = between(0, 1)
     portfolio_ids = []
     securities = SecuritySingleton().get_securities()
     security_id = None
@@ -181,6 +181,8 @@ class EndToEndUser(HttpUser):
     cash_portfolio_queue = Queue(maxsize=0)
     model_queue = Queue(maxsize=0)
     rebalance_queue = Queue(maxsize=0)
+    order_queue = Queue(maxsize=0)
+    submitted_orders_queue = Queue(maxsize=0)
 
     @task
     def post_portfolio_group(self):
@@ -232,7 +234,7 @@ class EndToEndUser(HttpUser):
                 self.model_queue.put(response[0])
                 print(f"Created model: {response[0]}")
             else:
-                raise Exception(f"Failed to create models")
+                raise Exception(f"Failed to create models.  Status code: {response.status_code}, Reason: {response.reason}")
         except Empty:
             print("No portfolios to create models for")
                 
@@ -244,13 +246,75 @@ class EndToEndUser(HttpUser):
             model_id = self.model_queue.get(timeout=1)
             response = portal_client.rebalance_investment_model(self.client, model_id)
             if response.ok:
-                self.rebalance_queue.put(response.json()['rebalance_ids'])
+                print(f"Number of rebalances generated: {len(response.json()['rebalance_ids'])}")
+                # TODO: Fix this in the backend so that we don't get duplicate rebalance ids.  This is a hack to remove duplicates.
+                print(f"Rebalance ids (right before put): {response.json()['rebalance_ids']}")
+                to_put = response.json()['rebalance_ids'][0]
+                print(f"To put: {to_put}")
+                self.rebalance_queue.put([to_put])
             else:
-                raise Exception(f"Failed to rebalance model: {model_id}")
+                raise Exception(f"Failed to rebalance model: {model_id}.  Status code: {response.status_code}, Reason: {response.reason}")
         except Empty:
             print("No models to rebalance")
 
+    @task
+    def submit_rebalances(self):
+        print("Submitting rebalances")
+        try:
+            rebalance_ids = self.rebalance_queue.get(timeout=0.01)
+            print(f"Rebalance ids: {rebalance_ids}")
+            print(f"Number of rebalances to submit: {len(rebalance_ids)}")
+            for rebalance_id in rebalance_ids:
+                response = portal_client.submit_rebalance(self.client, rebalance_id)
+                if response.ok:
+                    print(f"Submitted rebalance: {rebalance_id}")
+                    order_ids = response.json()['submittedOrderIds']
+                    self.order_queue.put(order_ids)
+                else:
+                    raise Exception(f"Failed to submit rebalance: {rebalance_id}.  Status code: {response.status_code}, Reason: {response.reason}")
+        except Empty:
+            print("No rebalances to submit")
+
+
+    @task
+    def submit_orders(self):
+        print("Submitting orders")
+        try:
+            order_ids = self.order_queue.get(timeout=0.01)
+            print(f"Order ids: {order_ids}")
+            print(f"Number of orders to submit: {len(order_ids)}")
+            response = portal_client.submit_order(self.client, {"orderIds": order_ids})
+            if response.ok:
+                print(f"Submitted orders: {order_ids}")
+                self.submitted_orders_queue.put(order_ids)
+            else:
+                raise Exception(f"Failed to submit orders: {order_ids}.  Status code: {response.status_code}, Reason: {response.reason}")
+        except Empty:
+            print("No orders to submit")
+
+
+
+    # curl -v -X POST -d '{"destinationId": 1, "quantity": 134}' "http://globeco.local:32080/api/trade-orders/50/submit"
+    # Response:
+    """
+    {
+        "id":37,
+        "executionTimestamp":"2025-08-11T12:31:26.645610472Z",
+        "executionStatus":{"id":2,"abbreviation":"SENT","description":"Sent","version":1},
+        "blotter":null,
+        "tradeType":{"id":1,"abbreviation":"BUY","description":"Buy","version":1},
+        "tradeOrder":{"id":50,"orderId":313688,"portfolioId":"689932cea711681c7aeda843","orderType":"BUY       ","securityId":"687597e4672efc735e8b1955","quantity":134,"quantitySent":0,"limitPrice":null,"tradeTimestamp":"2025-08-11T00:01:29.387056Z","blotter":null,"submitted":true,"version":2},
+        "destination":{"id":1,"abbreviation":"ML","description":"Merrill Lynch","version":1},
+        "quantityOrdered":"134.00",
+        "quantityPlaced":"134.00",
+        "quantityFilled":"0.00",
+        "limitPrice":null,
+        "version":2,
+        "executionServiceId":37}
+    """
     
+    
+    # curl "http://globeco.local:32080/api/trades?orderId=313688"        
 
     def on_stop(self):
         print("On stop")
@@ -258,6 +322,8 @@ class EndToEndUser(HttpUser):
         print(f"Length of cash_portfolio_queue: {self.cash_portfolio_queue.qsize()}")
         print(f"Length of model_queue: {self.model_queue.qsize()}")
         print(f"Length of rebalance_queue: {self.rebalance_queue.qsize()}")
+
+        # ADD CODE TO DELETE UNUSED PORTFOLIOS and MODELS
 
     # @task
     # def get_portfolio(self):

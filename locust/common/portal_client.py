@@ -106,8 +106,38 @@ def delete_investment_model(base:str, id:str, version:int) -> requests.Response:
 
 def rebalance_investment_model(client:HttpUser, id:str) -> requests.Response:
     model = f"/api/models/{id}/rebalance"
+    # print(f"Rebalancing model: {model}")
     response = client.post(model, name="/api/models/{id}/rebalance")
+    # print(f"Response: {response.json()}")
     return response
+
+def get_rebalance(client:HttpUser, id:str) -> requests.Response:
+    rebalance = f"/api/rebalances/{id}"
+    response = client.get(rebalance, name="/api/rebalances/{id}")
+    return response
+
+def submit_rebalance(client:HttpUser, id:str) -> requests.Response:
+    print(f"Submitting rebalance: {id}")
+    rebalance = get_rebalance(client, id)
+    if rebalance.ok:
+        print(f"Number of portfolios rebalanced: {len(rebalance.json()['portfolios'])}")
+        for portfolio in rebalance.json()['portfolios']:
+            # print(f"Submitting rebalance for portfolio: {portfolio['portfolio_id']}")
+            rebalance_path = "/api/rebalances/submit-positions"
+            positions = portfolio['positions']
+            positions = [{'security_id': position['security_id'], 'transaction_type': position['transaction_type'], 'trade_quantity': position['trade_quantity'], 'target_weight': position['target']} for position in positions]
+            # print(f"Positions: {positions}")
+            response = client.post(rebalance_path, json={'portfolioId': portfolio['portfolio_id'], 'positions': positions})
+            if response.ok:
+                # print(f"Submitted rebalance: {portfolio['portfolio_id']}")
+                print(f"Response from submit-positions: {response.json()}")
+                return response
+            else:
+                raise Exception(f"Failed to submit rebalance: {portfolio['portfolio_id']}.  Status code: {response.status_code}, Reason: {response.reason}  ")
+    else:
+        raise Exception(f"Failed to get rebalance: {id}.  Status code: {rebalance.status_code}, Reason: {rebalance.reason}  ")
+
+
 
 
 
@@ -148,8 +178,8 @@ def delete_orders(base:str, id:str, version:int) -> requests.Response:
 
 
 def submit_order(client:HttpUser, data:json) -> requests.Response:
-    orders = f"/api/orders/batch/submit"
-    response = client.post(orders, json=data, name="/api/orders/batch/submit")
+    orders = "/api/orders/batch/submit"
+    response = client.post(orders, json=data)
     return response
 
 
