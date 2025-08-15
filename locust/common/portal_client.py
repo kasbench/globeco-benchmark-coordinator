@@ -200,6 +200,11 @@ def get_trade(base:str, id:str) -> requests.Response:
     response = requests.get(trade)
     return response
 
+def get_trade_by_order_id(client:HttpUser, id:str) -> requests.Response:
+    trade = f"/api/trades?orderId={id}"
+    response = client.get(trade, name="/api/trades?orderId")
+    return response
+
 
 def post_trades(base:str, data:json) -> requests.Response:
     trades = f"{base}/api/trades"
@@ -219,10 +224,32 @@ def put_trades(base:str, id:str, data:json) -> requests.Response:
     return response
 
 
-def submit_trade(base:str, id:str) -> requests.Response:
-    trades = f"{base}/api/trade-orders/{id}/submit"
-    response = requests.post(trades)
+def submit_trade(client:HttpUser, id:str, quantity:float) -> requests.Response:
+    trades = f"/api/trade-orders/{id}/submit"
+    data = {"destinationId": 1, "quantity": quantity}
+    response = client.post(trades, json=data, name="/api/trade-orders/{id}/submit")
     return response
+
+
+# curl -v -X POST -d '{"destinationId": 1, "quantity": 134}' "http://globeco.local:32080/api/trade-orders/50/submit"
+    # Response:
+    """
+    {
+        "id":37,
+        "executionTimestamp":"2025-08-11T12:31:26.645610472Z",
+        "executionStatus":{"id":2,"abbreviation":"SENT","description":"Sent","version":1},
+        "blotter":null,
+        "tradeType":{"id":1,"abbreviation":"BUY","description":"Buy","version":1},
+        "tradeOrder":{"id":50,"orderId":313688,"portfolioId":"689932cea711681c7aeda843","orderType":"BUY       ","securityId":"687597e4672efc735e8b1955","quantity":134,"quantitySent":0,"limitPrice":null,"tradeTimestamp":"2025-08-11T00:01:29.387056Z","blotter":null,"submitted":true,"version":2},
+        "destination":{"id":1,"abbreviation":"ML","description":"Merrill Lynch","version":1},
+        "quantityOrdered":"134.00",
+        "quantityPlaced":"134.00",
+        "quantityFilled":"0.00",
+        "limitPrice":null,
+        "version":2,
+        "executionServiceId":37}
+    """
+
 
 
 def submit_trades(base:str, data:json) -> requests.Response:

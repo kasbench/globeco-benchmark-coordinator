@@ -1,5 +1,4 @@
 import datetime
-import json
 import random
 import time
 from random import sample
@@ -7,6 +6,7 @@ import uuid
 from locust import HttpUser, task, between, events
 import requests
 from queue import Queue, Empty
+from gevent.lock import Semaphore
 
 import common.portal_client as portal_client
 from common.security_singleton import SecuritySingleton
@@ -177,12 +177,20 @@ class EndToEndUser(HttpUser):
     model_ids = []
     rebalance_ids = []
     security_singleton = SecuritySingleton()
-    new_portfolio_queue = Queue(maxsize=0)
-    cash_portfolio_queue = Queue(maxsize=0)
-    model_queue = Queue(maxsize=0)
-    rebalance_queue = Queue(maxsize=0)
-    order_queue = Queue(maxsize=0)
-    submitted_orders_queue = Queue(maxsize=0)
+    new_portfolio_queue = Queue()
+    new_portfolio_queue_lock = Semaphore(1)
+    cash_portfolio_queue = Queue()
+    cash_portfolio_queue_lock = Semaphore(1)
+    model_queue = Queue()
+    model_queue_lock = Semaphore(1)
+    rebalance_queue = Queue()
+    rebalance_queue_lock = Semaphore(1)
+    order_queue = Queue()
+    order_queue_lock = Semaphore(1)
+    submitted_orders_queue = Queue()
+    submitted_orders_queue_lock = Semaphore(1)
+    execution_queue = Queue()
+    execution_queue_lock = Semaphore(1)
 
     @task
     def post_portfolio_group(self):
@@ -201,14 +209,16 @@ class EndToEndUser(HttpUser):
                 print(response.text)
                 raise Exception(f"Failed to create portfolio: {response.status_code} {response.reason}")
                 time.sleep(1) # Might need exponential backoff here or max retries
-        self.new_portfolio_queue.put(portfolio_ids)
+        with self.new_portfolio_queue_lock:
+            self.new_portfolio_queue.put(portfolio_ids)
 
 
     @task
     def fund_porfolios_with_cash(self):
         print("Funding portfolios with cash")
         try:
-            portfolio_ids = self.new_portfolio_queue.get(timeout=0.01)
+            with self.new_portfolio_queue_lock:
+                portfolio_ids = self.new_portfolio_queue.get(block=False)
             funded_portfolios = []
             for portfolio_id in portfolio_ids:
                 cash_transaction = create_cash_transaction(portfolio_id)
@@ -218,7 +228,8 @@ class EndToEndUser(HttpUser):
                 else:
                     print(f"Failed to fund portfolio: {portfolio_id}")
                     time.sleep(1) # Might need exponential backoff here or max retries
-            self.cash_portfolio_queue.put(funded_portfolios)
+            with self.cash_portfolio_queue_lock:
+                self.cash_portfolio_queue.put(funded_portfolios)
         except Empty:
             print("No portfolios to fund")
 
@@ -227,11 +238,13 @@ class EndToEndUser(HttpUser):
     def create_models_for_portfolios(self):
         print("Creating models")
         try:
-            portfolio_ids = self.cash_portfolio_queue.get(timeout=0.01)
+            with self.cash_portfolio_queue_lock:
+                portfolio_ids = self.cash_portfolio_queue.get(block=False)
             model_id = str(uuid.uuid4())
             response = create_models(self.client, self.securities, portfolio_ids, POSITIONS_PER_MODEL, len(portfolio_ids), 1)
             if response:
-                self.model_queue.put(response[0])
+                with self.model_queue_lock:
+                    self.model_queue.put(response[0])
                 print(f"Created model: {response[0]}")
             else:
                 raise Exception(f"Failed to create models.  Status code: {response.status_code}, Reason: {response.reason}")
@@ -243,7 +256,8 @@ class EndToEndUser(HttpUser):
     def rebalance_models(self): 
         print("Rebalancing models")
         try: 
-            model_id = self.model_queue.get(timeout=1)
+            with self.model_queue_lock:
+                model_id = self.model_queue.get(timeout=1)
             response = portal_client.rebalance_investment_model(self.client, model_id)
             if response.ok:
                 print(f"Number of rebalances generated: {len(response.json()['rebalance_ids'])}")
@@ -251,7 +265,8 @@ class EndToEndUser(HttpUser):
                 print(f"Rebalance ids (right before put): {response.json()['rebalance_ids']}")
                 to_put = response.json()['rebalance_ids'][0]
                 print(f"To put: {to_put}")
-                self.rebalance_queue.put([to_put])
+                with self.rebalance_queue_lock:
+                    self.rebalance_queue.put([to_put])
             else:
                 raise Exception(f"Failed to rebalance model: {model_id}.  Status code: {response.status_code}, Reason: {response.reason}")
         except Empty:
@@ -261,15 +276,18 @@ class EndToEndUser(HttpUser):
     def submit_rebalances(self):
         print("Submitting rebalances")
         try:
-            rebalance_ids = self.rebalance_queue.get(timeout=0.01)
+            with self.rebalance_queue_lock:
+                rebalance_ids = self.rebalance_queue.get(block=False)
             print(f"Rebalance ids: {rebalance_ids}")
             print(f"Number of rebalances to submit: {len(rebalance_ids)}")
             for rebalance_id in rebalance_ids:
                 response = portal_client.submit_rebalance(self.client, rebalance_id)
                 if response.ok:
                     print(f"Submitted rebalance: {rebalance_id}")
-                    order_ids = response.json()['submittedOrderIds']
-                    self.order_queue.put(order_ids)
+                    with self.order_queue_lock:
+                        order_ids = response.json()['submittedOrderIds']
+                        for id in order_ids:
+                            self.order_queue.put(id)
                 else:
                     raise Exception(f"Failed to submit rebalance: {rebalance_id}.  Status code: {response.status_code}, Reason: {response.reason}")
         except Empty:
@@ -280,41 +298,49 @@ class EndToEndUser(HttpUser):
     def submit_orders(self):
         print("Submitting orders")
         try:
-            order_ids = self.order_queue.get(timeout=0.01)
-            print(f"Order ids: {order_ids}")
-            print(f"Number of orders to submit: {len(order_ids)}")
-            response = portal_client.submit_order(self.client, {"orderIds": order_ids})
+            with self.order_queue_lock:
+                order_id = self.order_queue.get(block=False)
+            print(f"(submit_orders) Order ids {order_id}")
+            # print(f"Number of orders to submit: {len(order_ids)}")
+            response = portal_client.submit_order(self.client, {"orderIds": [order_id]})
             if response.ok:
-                print(f"Submitted orders: {order_ids}")
-                self.submitted_orders_queue.put(order_ids)
+                print(f"Submitted orders: {order_id}")
+                with self.submitted_orders_queue_lock:
+                    self.submitted_orders_queue.put(order_id)
             else:
-                raise Exception(f"Failed to submit orders: {order_ids}.  Status code: {response.status_code}, Reason: {response.reason}")
+                raise Exception(f"Failed to submit orders: {order_id}.  Status code: {response.status_code}, Reason: {response.reason}")
         except Empty:
             print("No orders to submit")
+        except IndexError:
+            print("No orders to submit (IndexError)")
 
-
-
-    # curl -v -X POST -d '{"destinationId": 1, "quantity": 134}' "http://globeco.local:32080/api/trade-orders/50/submit"
-    # Response:
-    """
-    {
-        "id":37,
-        "executionTimestamp":"2025-08-11T12:31:26.645610472Z",
-        "executionStatus":{"id":2,"abbreviation":"SENT","description":"Sent","version":1},
-        "blotter":null,
-        "tradeType":{"id":1,"abbreviation":"BUY","description":"Buy","version":1},
-        "tradeOrder":{"id":50,"orderId":313688,"portfolioId":"689932cea711681c7aeda843","orderType":"BUY       ","securityId":"687597e4672efc735e8b1955","quantity":134,"quantitySent":0,"limitPrice":null,"tradeTimestamp":"2025-08-11T00:01:29.387056Z","blotter":null,"submitted":true,"version":2},
-        "destination":{"id":1,"abbreviation":"ML","description":"Merrill Lynch","version":1},
-        "quantityOrdered":"134.00",
-        "quantityPlaced":"134.00",
-        "quantityFilled":"0.00",
-        "limitPrice":null,
-        "version":2,
-        "executionServiceId":37}
-    """
-    
-    
-    # curl "http://globeco.local:32080/api/trades?orderId=313688"        
+    @task
+    def submit_trades(self):
+        print("Submitting trades")
+        try:
+            with self.submitted_orders_queue_lock:
+                order_id = self.submitted_orders_queue.get(block=False)
+            print(f"Order id: {order_id}")
+            # Get the trade order to find the quantity
+            response = portal_client.get_trade_by_order_id(self.client, order_id)
+            # print(f"Response: {response.json()}")
+            if response.ok:
+                id = response.json()['content'][0]['id']
+                quantity = response.json()['content'][0]['quantity']
+                print(f"Quantity: {quantity}")
+                response = portal_client.submit_trade(self.client,  id, quantity)
+                if response.ok:
+                    print(f"Submitted trade: {id}")   
+                    execution_id = response.json()['executionServiceId']
+                    with self.execution_queue_lock:
+                        self.execution_queue.put(execution_id)
+                else:
+                    raise Exception(f"Failed to submit trade: {id}.  Status code: {response.status_code}, Reason: {response.reason}")
+            else:       
+                raise Exception(f"Failed to get trade order: {order_id}.  Status code: {response.status_code}, Reason: {response.reason}")
+        except Empty:
+            print("No orders to submit")
+   
 
     def on_stop(self):
         print("On stop")
