@@ -103,7 +103,7 @@ class EndToEndUser(HttpUser):
                     self.model_queue.put(response[0])
                 print(f"Created model: {response[0]}")
             else:
-                raise Exception(f"Failed to create models.  Status code: {response.status_code}, Reason: {response.reason}")
+                raise Exception(f"No models created.")
         except Empty:
             print("No portfolios to create models for")
                 

@@ -12,10 +12,11 @@ from common.portal_common import create_cash_transaction, post_transactions, cre
 security_service_url = "http://globeco-security-service:8000"
 PORTFOLIOS_PER_MODEL = 10
 POSITIONS_PER_MODEL = 25
+MAX_RETRIES = 3
 
 
 class EndToEndUser(HttpUser):
-    wait_time = between(0, 1)
+    wait_time = between(1, 5)
     portfolio_ids = []
     securities = SecuritySingleton().get_securities()
     security_id = None
@@ -49,139 +50,106 @@ class EndToEndUser(HttpUser):
                 portfolio_id = response.json()["id"]
                 portfolio_ids.append(portfolio_id)
             else:
-                print(f"Failed to create portfolio: {response.status_code} {response.reason}")
-                print(response.text)
                 raise Exception(f"Failed to create portfolio: {response.status_code} {response.reason}")
-        with self.new_portfolio_queue_lock:
-            self.new_portfolio_queue.put(portfolio_ids)
+        return portfolio_ids
 
 
-    def fund_portfolios_with_cash(self):
+    def fund_portfolios_with_cash(self, portfolio_ids):
         print("Funding portfolios with cash")
-        try:
-            with self.new_portfolio_queue_lock:
-                portfolio_ids = self.new_portfolio_queue.get(block=False)
-            funded_portfolios = []
-            for portfolio_id in portfolio_ids:
+        funded_portfolio_ids = []
+        for portfolio_id in portfolio_ids:
+            for i in range(MAX_RETRIES):
                 cash_transaction = create_cash_transaction(portfolio_id)
                 total_requested, successful, failed, results = post_transactions(self.client, [cash_transaction])
                 if successful > 0:
-                    funded_portfolios.append(portfolio_id)
+                    funded_portfolio_ids.append(portfolio_id)
+                    break
                 else:
                     print(f"Failed to fund portfolio: {portfolio_id}")
-                    time.sleep(1) # Might need exponential backoff here or max retries
-            with self.cash_portfolio_queue_lock:
-                self.cash_portfolio_queue.put(funded_portfolios)
-        except Empty:
-            print("No portfolios to fund")
+                    backoff_time = 2 ** i # Exponential backoff based on retry attempt
+                    print(f"Retrying in {backoff_time} seconds...")
+                    time.sleep(backoff_time)
+                raise Exception(f"Failed to fund portfolio: {portfolio_id}. Results: {results}")
+        return funded_portfolio_ids
+    
 
-
-    def create_models_for_portfolios(self):
-        print("Creating models")
-        try:
-            with self.cash_portfolio_queue_lock:
-                portfolio_ids = self.cash_portfolio_queue.get(block=False)
-            model_id = str(uuid.uuid4())
-            response = create_models(self.client, self.securities, portfolio_ids, POSITIONS_PER_MODEL, len(portfolio_ids), 1)
-            if response:
-                with self.model_queue_lock:
-                    self.model_queue.put(response[0])
-                print(f"Created model: {response[0]}")
-            else:
-                raise Exception(f"Failed to create models.  Status code: {response.status_code}, Reason: {response.reason}")
-        except Empty:
-            print("No portfolios to create models for")
+    def create_models_for_portfolios(self, portfolio_ids):
+        print("Creating model")
+        response = create_models(self.client, self.securities, portfolio_ids, POSITIONS_PER_MODEL, len(portfolio_ids), 1)
+        if response:
+            model_id = response[0]
+            return model_id
+        else:
+            raise Exception(f"No models created.")
                 
 
-    def rebalance_models(self): 
-        print("Rebalancing models")
-        try: 
-            with self.model_queue_lock:
-                model_id = self.model_queue.get(timeout=1)
-            response = portal_client.rebalance_investment_model(self.client, model_id)
-            if response.ok:
-                print(f"Number of rebalances generated: {len(response.json()['rebalance_ids'])}")
-                # TODO: Fix this in the backend so that we don't get duplicate rebalance ids.  This is a hack to remove duplicates.
-                print(f"Rebalance ids (right before put): {response.json()['rebalance_ids']}")
-                to_put = response.json()['rebalance_ids'][0]
-                print(f"To put: {to_put}")
-                with self.rebalance_queue_lock:
-                    self.rebalance_queue.put([to_put])
-            else:
-                raise Exception(f"Failed to rebalance model: {model_id}.  Status code: {response.status_code}, Reason: {response.reason}")
-        except Empty:
-            print("No models to rebalance")
+    def rebalance_models(self, model_id): 
+        print("Rebalancing model")
+        response = portal_client.rebalance_investment_model(self.client, model_id)
+        if response.ok:
+            rebalance_id = response.json()['rebalance_ids'][0]
+            return rebalance_id
+        else:
+            raise Exception(f"Failed to rebalance model: {model_id}.  Status code: {response.status_code}, Reason: {response.reason}")
 
-    def submit_rebalances(self):
-        print("Submitting rebalances")
-        try:
-            with self.rebalance_queue_lock:
-                rebalance_ids = self.rebalance_queue.get(block=False)
-            print(f"Rebalance ids: {rebalance_ids}")
-            print(f"Number of rebalances to submit: {len(rebalance_ids)}")
-            for rebalance_id in rebalance_ids:
-                response = portal_client.submit_rebalance(self.client, rebalance_id)
-                if response.ok:
-                    print(f"Submitted rebalance: {rebalance_id}")
-                    with self.order_queue_lock:
-                        order_ids = response.json()['submittedOrderIds']
-                        for id in order_ids:
-                            self.order_queue.put(id)
-                else:
-                    raise Exception(f"Failed to submit rebalance: {rebalance_id}.  Status code: {response.status_code}, Reason: {response.reason}")
-        except Empty:
-            print("No rebalances to submit")
+    def submit_rebalance(self, rebalance_id):
+        print("Submitting rebalance")
+        response = portal_client.submit_rebalance(self.client, rebalance_id)
+        if response.ok:
+            order_ids = response.json()['submittedOrderIds']
+            return order_ids
+        else:
+            raise Exception(f"Failed to submit rebalance: {rebalance_id}.  Status code: {response.status_code}, Reason: {response.reason}")
 
 
-    @task
-    def submit_orders(self):
+    def submit_orders(self, order_ids):
         print("Submitting orders")
-        try:
-            with self.order_queue_lock:
-                order_id = self.order_queue.get(block=False)
-            print(f"(submit_orders) Order ids {order_id}")
-            # print(f"Number of orders to submit: {len(order_ids)}")
-            response = portal_client.submit_order(self.client, {"orderIds": [order_id]})
-            if response.ok:
-                print(f"Submitted orders: {order_id}")
-                with self.submitted_orders_queue_lock:
-                    self.submitted_orders_queue.put(order_id)
-            else:
-                raise Exception(f"Failed to submit orders: {order_id}.  Status code: {response.status_code}, Reason: {response.reason}")
-        except Empty:
-            print("No orders to submit")
-        except IndexError:
-            print("No orders to submit (IndexError)")
-
-    @task
-    def submit_trades(self):
+        response = portal_client.submit_order(self.client, {"orderIds": order_ids})
+        if response.ok:
+            successful = response.json()['successful']
+            failed = response.json()['failed']
+            if failed:
+                raise Exception(f"Error submitting orders: Successful: {successful}, Failed: {failed}")
+            return order_ids
+        else:
+            raise Exception(f"Failed to submit orders: {order_ids}.  Status code: {response.status_code}, Reason: {response.reason}")
+        
+    def submit_trades(self, submitted_order_ids):
         print("Submitting trades")
-        try:
-            with self.submitted_orders_queue_lock:
-                order_id = self.submitted_orders_queue.get(block=False)
+        execution_ids = []
+        for order_id in submitted_order_ids:
             print(f"Order id: {order_id}")
-            # Get the trade order to find the quantity
+            # Get the trade order to find the id and quantity
             response = portal_client.get_trade_by_order_id(self.client, order_id)
-            # print(f"Response: {response.json()}")
             if response.ok:
                 id = response.json()['content'][0]['id']
                 quantity = response.json()['content'][0]['quantity']
-                print(f"Quantity: {quantity}")
                 response = portal_client.submit_trade(self.client,  id, quantity)
                 if response.ok:
                     print(f"Submitted trade: {id}")   
                     execution_id = response.json()['executionServiceId']
-                    with self.execution_queue_lock:
-                        self.execution_queue.put(execution_id)
+                    execution_ids.append(execution_id)
                 else:
                     raise Exception(f"Failed to submit trade: {id}.  Status code: {response.status_code}, Reason: {response.reason}")
             else:       
                 raise Exception(f"Failed to get trade order: {order_id}.  Status code: {response.status_code}, Reason: {response.reason}")
-        except Empty:
-            print("No orders to submit")
-   
+
+
+    @task
+    def run_sequential(self):
+        portfolio_ids = self.post_portfolio_group()
+        funded_portfolio_ids = self.fund_portfolios_with_cash(portfolio_ids)
+        model_id = self.create_models_for_portfolios(funded_portfolio_ids)
+        rebalance_id = self.rebalance_models(model_id)
+        order_ids = self.submit_rebalance(rebalance_id)
+        submitted_order_ids = self.submit_orders(order_ids)
+        self.submit_trades(submitted_order_ids)
+
+
+
 
     def on_stop(self):
+        # TODO: Add call to portfolio accounting CLI (must be once for the entire batch)    
         print("On stop")
         print(f"Length of new_portfolio_queue: {self.new_portfolio_queue.qsize()}")
         print(f"Length of cash_portfolio_queue: {self.cash_portfolio_queue.qsize()}")
