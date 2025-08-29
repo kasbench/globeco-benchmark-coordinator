@@ -1,6 +1,6 @@
 import time
 import uuid
-from locust import HttpUser, task, between
+from locust import HttpUser, task, between, events
 from queue import Queue, Empty
 from gevent.lock import Semaphore
 
@@ -18,11 +18,9 @@ MAX_RETRIES = 3
 class EndToEndUser(HttpUser):
     wait_time = between(1, 5)
     portfolio_ids = []
-    securities = SecuritySingleton().get_securities()
     security_id = None
     model_ids = []
     rebalance_ids = []
-    security_singleton = SecuritySingleton()
     new_portfolio_queue = Queue()
     new_portfolio_queue_lock = Semaphore(1)
     cash_portfolio_queue = Queue()
@@ -38,6 +36,10 @@ class EndToEndUser(HttpUser):
     execution_queue = Queue()
     execution_queue_lock = Semaphore(1)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.securities = SecuritySingleton().get_securities(self.client)
+    
     def post_portfolio_group(self):
         print("Posting portfolio group")
         portfolio_ids = []
@@ -146,8 +148,6 @@ class EndToEndUser(HttpUser):
         self.submit_trades(submitted_order_ids)
 
 
-
-
     def on_stop(self):
         # TODO: Add call to portfolio accounting CLI (must be once for the entire batch)    
         print("On stop")
@@ -157,4 +157,12 @@ class EndToEndUser(HttpUser):
         print(f"Length of rebalance_queue: {self.rebalance_queue.qsize()}")
 
 
+    @events.test_stop.add_listener
+    def on_test_stop(environment, **kwargs):
+        print("A new test is ending")
+        try:
+            print(f"Host is {environment.host}")
+            print(f"Dir: {dir(environment)}")
+        except Exception as e:
+            print(f"Error: {e}")
 

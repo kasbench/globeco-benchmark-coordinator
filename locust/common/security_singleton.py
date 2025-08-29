@@ -20,9 +20,9 @@ class SecuritySingleton(metaclass=SecurityMeta):
         print("Initializing SecuritySingleton")
         self.securities = []
 
-    def get_securities(self):
+    def get_securities(self, client):
         while not self.securities:
-            response = portal_client.get_securities(security_service_url)        
+            response = portal_client.get_securities(client)        
             if response.ok:
                 print(f"Got {len(response.json())} securities")
                 self.securities= response.json()

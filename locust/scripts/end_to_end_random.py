@@ -29,11 +29,9 @@ POSITIONS_PER_MODEL = 25
 class EndToEndUser(HttpUser):
     wait_time = between(0, 1)
     portfolio_ids = []
-    securities = SecuritySingleton().get_securities()
     security_id = None
     model_ids = []
     rebalance_ids = []
-    security_singleton = SecuritySingleton()
     new_portfolio_queue = Queue()
     new_portfolio_queue_lock = Semaphore(1)
     cash_portfolio_queue = Queue()
@@ -48,6 +46,10 @@ class EndToEndUser(HttpUser):
     submitted_orders_queue_lock = Semaphore(1)
     execution_queue = Queue()
     execution_queue_lock = Semaphore(1)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.securities = SecuritySingleton().get_securities(self.client)
 
     @task
     def post_portfolio_group(self):
@@ -199,7 +201,6 @@ class EndToEndUser(HttpUser):
    
 
     def on_stop(self):
-        print("On stop")
         print(f"Length of new_portfolio_queue: {self.new_portfolio_queue.qsize()}")
         print(f"Length of cash_portfolio_queue: {self.cash_portfolio_queue.qsize()}")
         print(f"Length of model_queue: {self.model_queue.qsize()}")

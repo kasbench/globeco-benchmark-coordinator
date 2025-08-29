@@ -67,9 +67,14 @@ def delete_portfolios(client:HttpUser, id:str, version:int) -> requests.Response
 
 # Security Functions
 
-def get_securities(base:str) -> requests.Response:
-    securities = f"{base}/api/v1/securities"
-    response = requests.get(securities)
+# def get_securities(base:str) -> requests.Response:
+#     securities = f"{base}/api/v1/securities"
+#     response = requests.get(securities)
+#     return response
+
+def get_securities(client:HttpUser) -> requests.Response:
+    securities = f"/api/securities"
+    response = client.get(securities)
     return response
 
 
