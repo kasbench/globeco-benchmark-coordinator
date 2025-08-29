@@ -1,5 +1,6 @@
 import time
 import uuid
+import requests
 from locust import HttpUser, task, between, events
 from queue import Queue, Empty
 from gevent.lock import Semaphore
@@ -159,10 +160,13 @@ class EndToEndUser(HttpUser):
 
     @events.test_stop.add_listener
     def on_test_stop(environment, **kwargs):
-        print("A new test is ending")
-        try:
-            print(f"Host is {environment.host}")
-            print(f"Dir: {dir(environment)}")
-        except Exception as e:
-            print(f"Error: {e}")
-
+        print("Sending allocations to Portfolio Accounting")
+        host = environment.host
+        url = f"{host}/api/allocations/executions/send"
+        print(f"URL: {url}")
+        response = requests.post(url, data={})
+        if response.ok:
+            print("Allocations sent to Portfolio Accounting")
+            print(response.json())
+        else:
+            print(f"Failed to send allocations to Portfolio Accounting.  Status code: {response.status_code}, Reason: {response.reason}") 
