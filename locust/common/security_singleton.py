@@ -24,7 +24,7 @@ class SecuritySingleton(metaclass=SecurityMeta):
         while not self.securities:
             response = portal_client.get_securities(client)        
             if response.ok:
-                print(f"Got {len(response.json())} securities")
+                # print(f"Got {len(response.json())} securities")
                 self.securities= response.json()
             else:
                 print(f"Failed to get securities: {response.status_code} {response.reason}")

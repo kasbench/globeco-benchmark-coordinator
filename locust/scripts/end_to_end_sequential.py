@@ -1,12 +1,13 @@
 import time
 import uuid
 import requests
-from locust import HttpUser, task, between, events
+from locust import HttpUser, task, between, events, constant
 from queue import Queue, Empty
 from gevent.lock import Semaphore
 
 import common.portal_client as portal_client
 from common.security_singleton import SecuritySingleton
+from common.securities import get_securities
 
 from common.portal_common import create_cash_transaction, post_transactions, create_models
 
@@ -17,7 +18,8 @@ MAX_RETRIES = 3
 
 
 class EndToEndUser(HttpUser):
-    wait_time = between(1, 5)
+    # wait_time = between(1, 5)
+    wait_function = constant(1)
     portfolio_ids = []
     security_id = None
     model_ids = []
@@ -39,10 +41,11 @@ class EndToEndUser(HttpUser):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.securities = SecuritySingleton().get_securities(self.client)
+        # self.securities = SecuritySingleton().get_securities(self.client)
+        self.securities = get_securities()
     
     def post_portfolio_group(self):
-        print("Posting portfolio group")
+        # print("Posting portfolio group")
         portfolio_ids = []
         while len(portfolio_ids) < PORTFOLIOS_PER_MODEL:
             response = portal_client.post_portfolios(self.client, {
@@ -58,7 +61,7 @@ class EndToEndUser(HttpUser):
 
 
     def fund_portfolios_with_cash(self, portfolio_ids):
-        print("Funding portfolios with cash")
+        # print("Funding portfolios with cash")
         funded_portfolio_ids = []
         for portfolio_id in portfolio_ids:
             for i in range(MAX_RETRIES):
@@ -77,7 +80,7 @@ class EndToEndUser(HttpUser):
     
 
     def create_models_for_portfolios(self, portfolio_ids):
-        print("Creating model")
+        # print("Creating model")
         response = create_models(self.client, self.securities, portfolio_ids, POSITIONS_PER_MODEL, len(portfolio_ids), 1)
         if response:
             model_id = response[0]
@@ -87,7 +90,7 @@ class EndToEndUser(HttpUser):
                 
 
     def rebalance_models(self, model_id): 
-        print("Rebalancing model")
+        # print("Rebalancing model")
         response = portal_client.rebalance_investment_model(self.client, model_id)
         if response.ok:
             rebalance_id = response.json()['rebalance_ids'][0]
@@ -96,7 +99,7 @@ class EndToEndUser(HttpUser):
             raise Exception(f"Failed to rebalance model: {model_id}.  Status code: {response.status_code}, Reason: {response.reason}")
 
     def submit_rebalance(self, rebalance_id):
-        print("Submitting rebalance")
+        # print("Submitting rebalance")
         response = portal_client.submit_rebalance(self.client, rebalance_id)
         if response.ok:
             order_ids = response.json()['submittedOrderIds']
@@ -106,7 +109,7 @@ class EndToEndUser(HttpUser):
 
 
     def submit_orders(self, order_ids):
-        print("Submitting orders")
+        # print("Submitting orders")
         response = portal_client.submit_order(self.client, {"orderIds": order_ids})
         if response.ok:
             successful = response.json()['successful']
@@ -118,10 +121,10 @@ class EndToEndUser(HttpUser):
             raise Exception(f"Failed to submit orders: {order_ids}.  Status code: {response.status_code}, Reason: {response.reason}")
         
     def submit_trades(self, submitted_order_ids):
-        print("Submitting trades")
+        # print("Submitting trades")
         execution_ids = []
         for order_id in submitted_order_ids:
-            print(f"Order id: {order_id}")
+            # print(f"Order id: {order_id}")
             # Get the trade order to find the id and quantity
             response = portal_client.get_trade_by_order_id(self.client, order_id)
             if response.ok:
@@ -129,7 +132,7 @@ class EndToEndUser(HttpUser):
                 quantity = response.json()['content'][0]['quantity']
                 response = portal_client.submit_trade(self.client,  id, quantity)
                 if response.ok:
-                    print(f"Submitted trade: {id}")   
+                    # print(f"Submitted trade: {id}")   
                     execution_id = response.json()['executionServiceId']
                     execution_ids.append(execution_id)
                 else:
@@ -145,20 +148,27 @@ class EndToEndUser(HttpUser):
         model_id = self.create_models_for_portfolios(funded_portfolio_ids)
         rebalance_id = self.rebalance_models(model_id)
         order_ids = self.submit_rebalance(rebalance_id)
-        submitted_order_ids = self.submit_orders(order_ids)
-        self.submit_trades(submitted_order_ids)
+        # Process order_ids in batches of max_orders
+        max_orders = 5
+        for i in range(0, len(order_ids), max_orders):
+            try:
+                batch_order_ids = order_ids[i:i+max_orders]
+                submitted_order_ids = self.submit_orders(batch_order_ids)
+                self.submit_trades(submitted_order_ids)
+            except Exception as e:
+                print(f"Error submitting orders for batch {i}: {e}")
+                continue
+
+    # def on_stop(self):
+    #     # TODO: Add call to portfolio accounting CLI (must be once for the entire batch)    
+    #     # print("On stop")
+    #     print(f"Length of new_portfolio_queue: {self.new_portfolio_queue.qsize()}")
+    #     print(f"Length of cash_portfolio_queue: {self.cash_portfolio_queue.qsize()}")
+    #     print(f"Length of model_queue: {self.model_queue.qsize()}")
+    #     print(f"Length of rebalance_queue: {self.rebalance_queue.qsize()}")
 
 
-    def on_stop(self):
-        # TODO: Add call to portfolio accounting CLI (must be once for the entire batch)    
-        print("On stop")
-        print(f"Length of new_portfolio_queue: {self.new_portfolio_queue.qsize()}")
-        print(f"Length of cash_portfolio_queue: {self.cash_portfolio_queue.qsize()}")
-        print(f"Length of model_queue: {self.model_queue.qsize()}")
-        print(f"Length of rebalance_queue: {self.rebalance_queue.qsize()}")
-
-
-    @events.test_stop.add_listener
+    # @events.test_stop.add_listener
     def on_test_stop(environment, **kwargs):
         print("Sending allocations to Portfolio Accounting")
         host = environment.host

@@ -122,10 +122,10 @@ def get_rebalance(client:HttpUser, id:str) -> requests.Response:
     return response
 
 def submit_rebalance(client:HttpUser, id:str) -> requests.Response:
-    print(f"Submitting rebalance: {id}")
+    # print(f"Submitting rebalance: {id}")
     rebalance = get_rebalance(client, id)
     if rebalance.ok:
-        print(f"Number of portfolios rebalanced: {len(rebalance.json()['portfolios'])}")
+        # print(f"Number of portfolios rebalanced: {len(rebalance.json()['portfolios'])}")
         for portfolio in rebalance.json()['portfolios']:
             # print(f"Submitting rebalance for portfolio: {portfolio['portfolio_id']}")
             rebalance_path = "/api/rebalances/submit-positions"
@@ -135,7 +135,7 @@ def submit_rebalance(client:HttpUser, id:str) -> requests.Response:
             response = client.post(rebalance_path, json={'portfolioId': portfolio['portfolio_id'], 'positions': positions})
             if response.ok:
                 # print(f"Submitted rebalance: {portfolio['portfolio_id']}")
-                print(f"Response from submit-positions: {response.json()}")
+                # print(f"Response from submit-positions: {response.json()}")
                 return response
             else:
                 raise Exception(f"Failed to submit rebalance: {portfolio['portfolio_id']}.  Status code: {response.status_code}, Reason: {response.reason}  ")

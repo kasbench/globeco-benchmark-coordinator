@@ -117,24 +117,24 @@ def create_models(client, securities, portfolios, num_positions_per_model, num_p
     """
     Create models for the given portfolios and securities.
     """
-    print(f"Creating models for {len(portfolios)} portfolios")
-    print(f"Number of positions per model: {num_positions_per_model}")
-    print(f"Number of portfolios per model: {num_portfolios_per_model}")
-    print(f"Number of models: {num_models}")
+    # print(f"Creating models for {len(portfolios)} portfolios")
+    # print(f"Number of positions per model: {num_positions_per_model}")
+    # print(f"Number of portfolios per model: {num_portfolios_per_model}")
+    # print(f"Number of models: {num_models}")
     if num_models is None:
         num_models = len(portfolios) // num_portfolios_per_model
-        print(f"Number of models: {num_models}")
+        # print(f"Number of models: {num_models}")
     # Split portfolios into smaller random groups
     portfolio_groups = split_portfolios_randomly(portfolios, num_portfolios_per_model)
-    print(f"Number of portfolio groups: {len(portfolio_groups)}")
+    # print(f"Number of portfolio groups: {len(portfolio_groups)}")
     model_ids = []
 
     for i in range(num_models):
-        print(f"Creating model {i}")
-        print(f"Number of portfolios: {len(portfolios)}")
-        print(f"Number of securities: {len(securities)}")
+        # print(f"Creating model {i}")
+        # print(f"Number of portfolios: {len(portfolios)}")
+        # print(f"Number of securities: {len(securities)}")
         positions = generate_model_positions(num_positions_per_model, securities)
-        print(f"Positions generated: {len(positions)}")
+        # print(f"Positions generated: {len(positions)}")
         # Use the i-th portfolio group, cycling through if we have more models than groups
         portfolio_group = portfolio_groups[i % len(portfolio_groups)]
         model_id = str(uuid.uuid4())
