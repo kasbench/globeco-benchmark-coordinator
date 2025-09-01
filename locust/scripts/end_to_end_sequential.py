@@ -100,13 +100,13 @@ class EndToEndUser(HttpUser):
 
     def submit_rebalance(self, rebalance_id):
         # print("Submitting rebalance")
-        response = portal_client.submit_rebalance(self.client, rebalance_id)
-        if response.ok:
-            order_ids = response.json()['submittedOrderIds']
-            return order_ids
-        else:
-            raise Exception(f"Failed to submit rebalance: {rebalance_id}.  Status code: {response.status_code}, Reason: {response.reason}")
-
+        # response = portal_client.submit_rebalance(self.client, rebalance_id)
+        # if response.ok:
+        #     order_ids = response.json()['submittedOrderIds']
+        #     return order_ids
+        # else:
+        #     raise Exception(f"Failed to submit rebalance: {rebalance_id}.  Status code: {response.status_code}, Reason: {response.reason}")
+        return portal_client.submit_rebalance(self.client, rebalance_id)
 
     def submit_orders(self, order_ids):
         # print("Submitting orders")
@@ -149,11 +149,11 @@ class EndToEndUser(HttpUser):
         rebalance_id = self.rebalance_models(model_id)
         order_ids = self.submit_rebalance(rebalance_id)
         # Process order_ids in batches of max_orders
-        max_orders = 5
+        max_orders = 25
         for i in range(0, len(order_ids), max_orders):
             try:
                 batch_order_ids = order_ids[i:i+max_orders]
-                submitted_order_ids = self.submit_orders(batch_order_ids)
+                submitted_order_ids = self.submit_orders(batch_order_ids)  # this is where we are getting dupes
                 self.submit_trades(submitted_order_ids)
             except Exception as e:
                 print(f"Error submitting orders for batch {i}: {e}")
