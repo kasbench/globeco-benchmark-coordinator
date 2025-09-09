@@ -18,8 +18,8 @@ MAX_RETRIES = 3
 
 
 class EndToEndUser(HttpUser):
-    # wait_time = between(1, 5)
-    wait_function = constant(1)
+    wait_time = between(10, 60)
+    # wait_function = constant(1)
     portfolio_ids = []
     security_id = None
     model_ids = []

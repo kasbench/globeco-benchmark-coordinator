@@ -238,6 +238,12 @@ def submit_trade(client:HttpUser, id:str, quantity:float) -> requests.Response:
     response = client.post(trades, json=data, name="/api/trade-orders/{id}/submit")
     return response
 
+def submit_trade_slow(client:HttpUser, id:str, quantity:float) -> requests.Response:
+    trades = f"/api/trade-orders/{id}/submit"
+    data = {"destinationId": 1, "quantity": quantity}
+    response = client.post(trades, json=data, name="/api/trade-orders/{id}/submit")
+    return response
+
 
 # curl -v -X POST -d '{"destinationId": 1, "quantity": 134}' "http://globeco.local:32080/api/trade-orders/50/submit"
     # Response:
