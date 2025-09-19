@@ -1,9 +1,15 @@
 import time
 import uuid
 import requests
-from locust import HttpUser, task, between, events, constant
+import random
+import asyncio
+
+from locust import HttpUser, task, between, events, constant, FastHttpUser
 from queue import Queue, Empty
 from gevent.lock import Semaphore
+
+import resource
+resource.setrlimit(resource.RLIMIT_NOFILE, (10240, 9223372036854775807))
 
 import common.portal_client as portal_client
 from common.security_singleton import SecuritySingleton
@@ -18,7 +24,7 @@ MAX_RETRIES = 3
 
 
 class EndToEndUser(HttpUser):
-    wait_time = between(10, 60)
+    wait_time = between(1, 10)
     # wait_function = constant(1)
     portfolio_ids = []
     security_id = None
@@ -43,20 +49,63 @@ class EndToEndUser(HttpUser):
         super().__init__(*args, **kwargs)
         # self.securities = SecuritySingleton().get_securities(self.client)
         self.securities = get_securities()
+
+    def on_start(self):
+        """This method is called when the User is spawned."""
+        print("Waiting for up to 5 seconds before the first task...")
+        time.sleep(random.uniform(1, 10))
+        print("Wait complete. Starting tasks...")
     
+
     def post_portfolio_group(self):
+        # print("Posting portfolio group")
+        portfolios = [{
+                    "name": f"Test Portfolio {time.time()}-{i}",
+                    "dateCreated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                } for i in range(PORTFOLIOS_PER_MODEL)]
+        portfolio_ids = []
+        for attempt in range(MAX_RETRIES):
+            response = portal_client.post_portfolios_bulk(self.client, portfolios)
+            if response.ok:
+                portfolio_ids = [portfolio["portfolioId"] for portfolio in response.json()]
+                return portfolio_ids
+            elif 500 <= response.status_code < 600:
+                # Retry for 500-level status codes
+                if attempt < MAX_RETRIES - 1:
+                    backoff_time = 2 ** attempt  # Exponential backoff
+                    print(f"Portfolio creation failed with {response.status_code}, retrying in {backoff_time} seconds...")
+                    time.sleep(backoff_time)
+                else:
+                    raise Exception(f"Failed to create portfolio after {MAX_RETRIES} attempts: {response.status_code} {response.reason}")
+            else:
+                # Don't retry for non-500 status codes
+                raise Exception(f"Failed to create portfolio: {response.status_code} {response.reason}")
+        return potfolio_ids
+
+    def post_portfolio_group_slow(self):
         # print("Posting portfolio group")
         portfolio_ids = []
         while len(portfolio_ids) < PORTFOLIOS_PER_MODEL:
-            response = portal_client.post_portfolios(self.client, {
-                "name": f"Test Portfolio {time.time()}",
-                "dateCreated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            })
-            if response.ok:
-                portfolio_id = response.json()["id"]
-                portfolio_ids.append(portfolio_id)
-            else:
-                raise Exception(f"Failed to create portfolio: {response.status_code} {response.reason}")
+            for attempt in range(MAX_RETRIES):
+                response = portal_client.post_portfolios(self.client, {
+                    "name": f"Test Portfolio {time.time()}",
+                    "dateCreated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                })
+                if response.ok:
+                    portfolio_id = response.json()["id"]
+                    portfolio_ids.append(portfolio_id)
+                    break
+                elif 500 <= response.status_code < 600:
+                    # Retry for 500-level status codes
+                    if attempt < MAX_RETRIES - 1:
+                        backoff_time = 2 ** attempt  # Exponential backoff
+                        print(f"Portfolio creation failed with {response.status_code}, retrying in {backoff_time} seconds...")
+                        time.sleep(backoff_time)
+                    else:
+                        raise Exception(f"Failed to create portfolio after {MAX_RETRIES} attempts: {response.status_code} {response.reason}")
+                else:
+                    # Don't retry for non-500 status codes
+                    raise Exception(f"Failed to create portfolio: {response.status_code} {response.reason}")
         return portfolio_ids
 
 
@@ -112,15 +161,31 @@ class EndToEndUser(HttpUser):
         # print("Submitting orders")
         response = portal_client.submit_order(self.client, {"orderIds": order_ids})
         if response.ok:
+            # print("Submitted order results:")
+            # print(response.json())
+            # print()
             successful = response.json()['successful']
             failed = response.json()['failed']
             if failed:
                 raise Exception(f"Error submitting orders: Successful: {successful}, Failed: {failed}")
-            return order_ids
+            trade_order_ids = []
+            for order in response.json()['results']:
+                trade_order_ids.append(order['tradeOrderId'])
+            return trade_order_ids
         else:
             raise Exception(f"Failed to submit orders: {order_ids}.  Status code: {response.status_code}, Reason: {response.reason}")
         
+
     def submit_trades(self, submitted_order_ids):
+        # print("Submitting trades")
+        execution_ids = []
+        response = portal_client.submit_trade(self.client, submitted_order_ids, [1] * len(submitted_order_ids))
+        if not response.ok:
+            print(f"Failed to submit trades: {submitted_order_ids}.  Status code: {response.status_code}, Reason: {response.reason}")
+            raise Exception(f"Failed to submit trades: {submitted_order_ids}.  Status code: {response.status_code}, Reason: {response.reason}")
+        
+
+    def submit_trades_slow(self, submitted_order_ids):
         # print("Submitting trades")
         execution_ids = []
         for order_id in submitted_order_ids:
@@ -143,6 +208,30 @@ class EndToEndUser(HttpUser):
 
     @task
     def run_sequential(self):
+        time.sleep(random.uniform(1, 5))
+        portfolio_ids = self.post_portfolio_group()
+        time.sleep(random.uniform(1, 5))
+        funded_portfolio_ids = self.fund_portfolios_with_cash(portfolio_ids)
+        model_id = self.create_models_for_portfolios(funded_portfolio_ids)
+        time.sleep(random.uniform(1, 5))
+        rebalance_id = self.rebalance_models(model_id)
+        time.sleep(random.uniform(1, 5))
+        order_ids = self.submit_rebalance(rebalance_id)
+        # Process order_ids in batches of max_orders
+        max_orders = 25
+        for i in range(0, len(order_ids), max_orders):
+            try:
+                batch_order_ids = order_ids[i:i+max_orders]
+                time.sleep(random.uniform(0, 2))
+                submitted_order_ids = self.submit_orders(batch_order_ids) 
+                self.submit_trades(submitted_order_ids)
+            except Exception as e:
+                print(f"Error submitting orders for batch {i}: {e}")
+                continue
+
+
+    # @task
+    def run_sequential_slow(self):
         portfolio_ids = self.post_portfolio_group()
         funded_portfolio_ids = self.fund_portfolios_with_cash(portfolio_ids)
         model_id = self.create_models_for_portfolios(funded_portfolio_ids)
@@ -153,11 +242,13 @@ class EndToEndUser(HttpUser):
         for i in range(0, len(order_ids), max_orders):
             try:
                 batch_order_ids = order_ids[i:i+max_orders]
-                submitted_order_ids = self.submit_orders(batch_order_ids)  # this is where we are getting dupes
+                submitted_order_ids = self.submit_orders(batch_order_ids) 
                 self.submit_trades(submitted_order_ids)
             except Exception as e:
                 print(f"Error submitting orders for batch {i}: {e}")
                 continue
+
+
 
     # def on_stop(self):
     #     # TODO: Add call to portfolio accounting CLI (must be once for the entire batch)    

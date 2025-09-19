@@ -2,8 +2,14 @@ from locust import HttpUser
 import requests
 import json
 import random
+import time
+from typing import List
+
+from requests.exceptions import ConnectionError
+import requests.packages.urllib3.util.connection
 import common.portal_client as portal_client
 
+requests.packages.urllib3.util.connection.HAS_IPV6 = False
 
 base = "http://globeco.local:31510"
 
@@ -58,6 +64,13 @@ def post_portfolios(client:HttpUser, data:dict) -> requests.Response:
     portfolios = f"/api/portfolios"
     response = client.post(portfolios, json.dumps(data), name="/api/portfolios")
     return response
+
+
+def post_portfolios_bulk(client:HttpUser, data:List[dict]) -> requests.Response:
+    portfolios = f"/api/portfolios/bulk"
+    response = client.post(portfolios, json.dumps(data), name="/api/portfolios/bulk")
+    return response
+
 
 def delete_portfolios(client:HttpUser, id:str, version:int) -> requests.Response:
     portfolios = f"/api/portfolios/{id}?version={version}"
@@ -232,11 +245,14 @@ def put_trades(base:str, id:str, data:json) -> requests.Response:
     return response
 
 
-def submit_trade(client:HttpUser, id:str, quantity:float) -> requests.Response:
-    trades = f"/api/trade-orders/{id}/submit"
-    data = {"destinationId": 1, "quantity": quantity}
-    response = client.post(trades, json=data, name="/api/trade-orders/{id}/submit")
+def submit_trade(client:HttpUser, ids:[str], quantities:[float]) -> requests.Response:
+    trades = f"/api/trade-orders/batch/submit"
+    data = [{"tradeOrderId": trade_order_id, "destinationId": 1, "quantity": quantity} 
+        for trade_order_id, quantity in zip(ids, quantities)]
+    data = {"submissions": data}
+    response = client.post(trades, json=data)
     return response
+
 
 def submit_trade_slow(client:HttpUser, id:str, quantity:float) -> requests.Response:
     trades = f"/api/trade-orders/{id}/submit"
