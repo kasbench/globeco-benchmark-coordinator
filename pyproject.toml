@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "jupyterlab>=4.4.5",
+    "kr8s>=0.20.10",
     "locust>=2.37.14",
     "numpy>=2.3.1",
     "pandas>=2.3.1",

@@ -9,13 +9,17 @@ from queue import Queue, Empty
 from gevent.lock import Semaphore
 
 import resource
-resource.setrlimit(resource.RLIMIT_NOFILE, (10240, 9223372036854775807))
+try:
+    resource.setrlimit(resource.RLIMIT_NOFILE, (10240, 9223372036854775807))
+except:
+    # Throws an exception on Ubuntu.  Helpful for Mac
+    pass
 
 import common.portal_client as portal_client
 from common.security_singleton import SecuritySingleton
 from common.securities import get_securities
 
-from common.portal_common import create_cash_transaction, post_transactions, create_models
+from common.portal_common import create_cash_transaction, post_transactions, create_models, post_portfolio_group
 
 security_service_url = "http://globeco-security-service:8000"
 PORTFOLIOS_PER_MODEL = 10
@@ -57,56 +61,33 @@ class EndToEndUser(HttpUser):
         print("Wait complete. Starting tasks...")
     
 
-    def post_portfolio_group(self):
-        # print("Posting portfolio group")
-        portfolios = [{
-                    "name": f"Test Portfolio {time.time()}-{i}",
-                    "dateCreated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-                } for i in range(PORTFOLIOS_PER_MODEL)]
-        portfolio_ids = []
-        for attempt in range(MAX_RETRIES):
-            response = portal_client.post_portfolios_bulk(self.client, portfolios)
-            if response.ok:
-                portfolio_ids = [portfolio["portfolioId"] for portfolio in response.json()]
-                return portfolio_ids
-            elif 500 <= response.status_code < 600:
-                # Retry for 500-level status codes
-                if attempt < MAX_RETRIES - 1:
-                    backoff_time = 2 ** attempt  # Exponential backoff
-                    print(f"Portfolio creation failed with {response.status_code}, retrying in {backoff_time} seconds...")
-                    time.sleep(backoff_time)
-                else:
-                    raise Exception(f"Failed to create portfolio after {MAX_RETRIES} attempts: {response.status_code} {response.reason}")
-            else:
-                # Don't retry for non-500 status codes
-                raise Exception(f"Failed to create portfolio: {response.status_code} {response.reason}")
-        return potfolio_ids
+    
 
-    def post_portfolio_group_slow(self):
-        # print("Posting portfolio group")
-        portfolio_ids = []
-        while len(portfolio_ids) < PORTFOLIOS_PER_MODEL:
-            for attempt in range(MAX_RETRIES):
-                response = portal_client.post_portfolios(self.client, {
-                    "name": f"Test Portfolio {time.time()}",
-                    "dateCreated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-                })
-                if response.ok:
-                    portfolio_id = response.json()["id"]
-                    portfolio_ids.append(portfolio_id)
-                    break
-                elif 500 <= response.status_code < 600:
-                    # Retry for 500-level status codes
-                    if attempt < MAX_RETRIES - 1:
-                        backoff_time = 2 ** attempt  # Exponential backoff
-                        print(f"Portfolio creation failed with {response.status_code}, retrying in {backoff_time} seconds...")
-                        time.sleep(backoff_time)
-                    else:
-                        raise Exception(f"Failed to create portfolio after {MAX_RETRIES} attempts: {response.status_code} {response.reason}")
-                else:
-                    # Don't retry for non-500 status codes
-                    raise Exception(f"Failed to create portfolio: {response.status_code} {response.reason}")
-        return portfolio_ids
+    # def post_portfolio_group_slow(self):
+    #     # print("Posting portfolio group")
+    #     portfolio_ids = []
+    #     while len(portfolio_ids) < PORTFOLIOS_PER_MODEL:
+    #         for attempt in range(MAX_RETRIES):
+    #             response = portal_client.post_portfolios(self.client, {
+    #                 "name": f"Test Portfolio {time.time()}",
+    #                 "dateCreated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    #             })
+    #             if response.ok:
+    #                 portfolio_id = response.json()["id"]
+    #                 portfolio_ids.append(portfolio_id)
+    #                 break
+    #             elif 500 <= response.status_code < 600:
+    #                 # Retry for 500-level status codes
+    #                 if attempt < MAX_RETRIES - 1:
+    #                     backoff_time = 2 ** attempt  # Exponential backoff
+    #                     print(f"Portfolio creation failed with {response.status_code}, retrying in {backoff_time} seconds...")
+    #                     time.sleep(backoff_time)
+    #                 else:
+    #                     raise Exception(f"Failed to create portfolio after {MAX_RETRIES} attempts: {response.status_code} {response.reason}")
+    #             else:
+    #                 # Don't retry for non-500 status codes
+    #                 raise Exception(f"Failed to create portfolio: {response.status_code} {response.reason}")
+    #     return portfolio_ids
 
 
     def fund_portfolios_with_cash(self, portfolio_ids):
@@ -209,7 +190,7 @@ class EndToEndUser(HttpUser):
     @task
     def run_sequential(self):
         time.sleep(random.uniform(1, 5))
-        portfolio_ids = self.post_portfolio_group()
+        portfolio_ids = post_portfolio_group(self.client)
         time.sleep(random.uniform(1, 5))
         funded_portfolio_ids = self.fund_portfolios_with_cash(portfolio_ids)
         model_id = self.create_models_for_portfolios(funded_portfolio_ids)
@@ -232,7 +213,7 @@ class EndToEndUser(HttpUser):
 
     # @task
     def run_sequential_slow(self):
-        portfolio_ids = self.post_portfolio_group()
+        portfolio_ids = post_portfolio_group(self.client)
         funded_portfolio_ids = self.fund_portfolios_with_cash(portfolio_ids)
         model_id = self.create_models_for_portfolios(funded_portfolio_ids)
         rebalance_id = self.rebalance_models(model_id)

@@ -51,3 +51,4 @@ docker buildx build \
 echo -e "${GREEN}Build completed successfully!${NC}"
 echo -e "${YELLOW}Image: $IMAGE_NAME:$TAG${NC}"
 echo -e "${YELLOW}Platforms: $PLATFORMS${NC}"
+ 

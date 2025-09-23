@@ -1,7 +1,13 @@
 import datetime
 import random
 import uuid
+import time
 
+import common.portal_client as portal_client
+
+
+PORTFOLIOS_PER_MODEL = 10
+MAX_RETRIES = 3
 
 def generate_model_positions(num_positions, securities, cash=0.05, increment=0.005):
     model_securities = random.sample(securities, num_positions)
@@ -143,3 +149,28 @@ def create_models(client, securities, portfolios, num_positions_per_model, num_p
             model_ids.append(response['model_id'])
 
     return model_ids
+
+def post_portfolio_group(client):
+    # print("Posting portfolio group")
+    portfolios = [{
+                "name": f"Test Portfolio {time.time()}-{i}-1",
+                "dateCreated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            } for i in range(PORTFOLIOS_PER_MODEL)]
+    portfolio_ids = []
+    for attempt in range(MAX_RETRIES):
+        response = portal_client.post_portfolios_bulk(client, portfolios)
+        if response.ok:
+            portfolio_ids = [portfolio["portfolioId"] for portfolio in response.json()]
+            return portfolio_ids
+        elif 500 <= response.status_code < 600:
+            # Retry for 500-level status codes
+            if attempt < MAX_RETRIES - 1:
+                backoff_time = 2 ** attempt  # Exponential backoff
+                print(f"Portfolio creation failed with {response.status_code}, retrying in {backoff_time} seconds...")
+                time.sleep(backoff_time)
+            else:
+                raise Exception(f"Failed to create portfolio after {MAX_RETRIES} attempts: {response.status_code} {response.reason}")
+        else:
+            # Don't retry for non-500 status codes
+            raise Exception(f"Failed to create portfolio: {response.status_code} {response.reason}")
+    return potfolio_ids

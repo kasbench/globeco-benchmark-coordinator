@@ -42,15 +42,15 @@ def get_portfolios(client:HttpUser) -> requests.Response:
 #     return response
 
 
-def get_portfolio(base:str, id:str) -> requests.Response:
-    portfolios = f"{base}/api/portfolios/{id}"
-    response = requests.get(portfolios)
+def get_portfolio(client, id:str) -> requests.Response:
+    url = f"/api/portfolios/{id}"
+    response = client.get(url, name="/api/portfolios/{id}")
     return response
 
 
-def put_portfolios(base:str, id:str, data:json) -> requests.Response:
-    portfolios = f"{base}/api/portfolios/{id}"
-    response = requests.put(portfolios, json=data)
+def put_portfolios(client, id:str, data:json) -> requests.Response:
+    portfolios = f"/api/portfolios/{id}"
+    response = client.put(portfolios, json=data, name="/api/portfolios/{id}")
     return response
 
 
@@ -68,7 +68,7 @@ def post_portfolios(client:HttpUser, data:dict) -> requests.Response:
 
 def post_portfolios_bulk(client:HttpUser, data:List[dict]) -> requests.Response:
     portfolios = f"/api/portfolios/bulk"
-    response = client.post(portfolios, json.dumps(data), name="/api/portfolios/bulk")
+    response = client.post(portfolios, json.dumps(data))
     return response
 
 

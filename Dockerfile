@@ -82,4 +82,4 @@ EXPOSE 8089
 # Change to locust directory and set the default command to run locust
 WORKDIR /app/locust
 ENV PYTHONPATH=/app/locust
-CMD ["uv", "run", "locust", "-f", "./scripts/end_to_end_sequential.py", "--host=http://globeco-portfolio-management-portal:3000"] 
+CMD ["uv", "run", "locust", "-f", "./scripts/calibration.py", "--host=http://globeco-portfolio-management-portal:3000"] 
