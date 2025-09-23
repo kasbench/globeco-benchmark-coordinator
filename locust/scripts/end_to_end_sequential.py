@@ -56,10 +56,8 @@ class EndToEndUser(HttpUser):
 
     def on_start(self):
         """This method is called when the User is spawned."""
-        print("Waiting for up to 5 seconds before the first task...")
         time.sleep(random.uniform(1, 10))
-        print("Wait complete. Starting tasks...")
-    
+        
 
     
 
