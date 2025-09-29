@@ -68,7 +68,7 @@ def post_portfolios(client:HttpUser, data:dict) -> requests.Response:
 
 def post_portfolios_bulk(client:HttpUser, data:List[dict]) -> requests.Response:
     portfolios = f"/api/portfolios/bulk"
-    response = client.post(portfolios, json.dumps(data))
+    response = client.post(portfolios, json.dumps(data), name=portfolios)
     return response
 
 
@@ -105,9 +105,9 @@ def post_investment_models(base:str, data:json) -> requests.Response:
     return response 
 
 
-def get_investment_model(base:str, id:str) -> requests.Response:
-    model = f"{base}/api/models/{id}"
-    response = requests.get(model)
+def get_investment_model(client, id:str) -> requests.Response:
+    model = f"/api/models/{id}"
+    response = client.get(model, name="/api/models/{id}")
     return response 
 
 
@@ -146,7 +146,7 @@ def submit_rebalance(client:HttpUser, id:str) -> requests.Response:
             positions = portfolio['positions']
             positions = [{'security_id': position['security_id'], 'transaction_type': position['transaction_type'], 'trade_quantity': position['trade_quantity'], 'target_weight': position['target']} for position in positions]
             # print(f"Positions: {positions}")
-            response = client.post(rebalance_path, json={'portfolioId': portfolio['portfolio_id'], 'positions': positions})
+            response = client.post(rebalance_path, json={'portfolioId': portfolio['portfolio_id'], 'positions': positions}, name=rebalance_path)
             if response.ok:
                 # print(f"Submitted rebalance: {portfolio['portfolio_id']}")
                 # print(f"Response from submit-positions: {response.json()}")
@@ -164,13 +164,13 @@ def submit_rebalance(client:HttpUser, id:str) -> requests.Response:
 
 # Order Functions
 
-def get_orders(base:str, offset:int=0, limit:int=100, status:str="", portfolio_id:str="") -> requests.Response:
-    orders = f"{base}/api/orders?offset={offset}&limit={limit}"
+def get_orders(client, offset:int=0, limit:int=100, status:str="", portfolio_id:str="") -> requests.Response:
+    orders = f"/api/orders?offset={offset}&limit={limit}"
     if status:
         orders += f"&status={status}"
     if portfolio_id:
         orders += f"&portfolio_id={portfolio_id}"
-    response = requests.get(orders)
+    response = client.get(orders, name="/api/orders")
     return response
 
 
@@ -200,19 +200,21 @@ def delete_orders(base:str, id:str, version:int) -> requests.Response:
 
 def submit_order(client:HttpUser, data:json) -> requests.Response:
     orders = "/api/orders/batch/submit"
-    response = client.post(orders, json=data)
+    response = client.post(orders, json=data, name=orders)
     return response
 
 
 # Trade Functions
 
-def get_trades(base:str, offset:int=0, limit:int=100, status:str=None, blotter_id:str=None) -> requests.Response:
-    trades = f"{base}/api/trades?offset={offset}&limit={limit}"
+def get_trades(client, offset:int=0, limit:int=100, status:str=None, blotter_id:str=None) -> requests.Response:
+    trades = f"/api/trades?offset={offset}&limit={limit}"
     if status:
         trades += f"&status={status}"
     if blotter_id:
         trades += f"&blotter_id={blotter_id}"
-    response = requests.get(trades)
+    response = client.get(trades, name="/api/trades")
+    if not response.ok:
+        print(f"Path: {trades}. Response: {response.text}")
     return response
 
 
@@ -289,8 +291,8 @@ def submit_trades(base:str, data:json) -> requests.Response:
 
 # Execution Functions
 
-def get_executions(base:str, offset:int=0, limit:int=100, status:str=None, portfolio_id:str=None, start_date:str=None, end_date:str=None) -> requests.Response:
-    executions = f"{base}/api/executions?offset={offset}&limit={limit}"
+def get_executions(client, offset:int=0, limit:int=100, status:str=None, portfolio_id:str=None, start_date:str=None, end_date:str=None) -> requests.Response:
+    executions = f"/api/executions?offset={offset}&limit={limit}"
     if status:
         executions += f"&status={status}"
     if portfolio_id:
@@ -299,7 +301,7 @@ def get_executions(base:str, offset:int=0, limit:int=100, status:str=None, portf
         executions += f"&start_date={start_date}"
     if end_date:
         executions += f"&end_date={end_date}"
-    response = requests.get(executions)
+    response = client.get(executions, name="/api/executions?portfolio_id={portfolio_id}")
     return response
 
 

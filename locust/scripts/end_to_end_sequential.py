@@ -28,26 +28,9 @@ MAX_RETRIES = 3
 
 
 class EndToEndUser(HttpUser):
-    wait_time = between(1, 10)
-    # wait_function = constant(1)
-    portfolio_ids = []
-    security_id = None
-    model_ids = []
-    rebalance_ids = []
-    new_portfolio_queue = Queue()
-    new_portfolio_queue_lock = Semaphore(1)
-    cash_portfolio_queue = Queue()
-    cash_portfolio_queue_lock = Semaphore(1)
-    model_queue = Queue()
-    model_queue_lock = Semaphore(1)
-    rebalance_queue = Queue()
-    rebalance_queue_lock = Semaphore(1)
-    order_queue = Queue()
-    order_queue_lock = Semaphore(1)
-    submitted_orders_queue = Queue()
-    submitted_orders_queue_lock = Semaphore(1)
-    execution_queue = Queue()
-    execution_queue_lock = Semaphore(1)
+    wait_time = between(5, 20)
+    
+    counter = 0
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -56,37 +39,8 @@ class EndToEndUser(HttpUser):
 
     def on_start(self):
         """This method is called when the User is spawned."""
-        time.sleep(random.uniform(1, 10))
+        time.sleep(random.uniform(1, 45))
         
-
-    
-
-    # def post_portfolio_group_slow(self):
-    #     # print("Posting portfolio group")
-    #     portfolio_ids = []
-    #     while len(portfolio_ids) < PORTFOLIOS_PER_MODEL:
-    #         for attempt in range(MAX_RETRIES):
-    #             response = portal_client.post_portfolios(self.client, {
-    #                 "name": f"Test Portfolio {time.time()}",
-    #                 "dateCreated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    #             })
-    #             if response.ok:
-    #                 portfolio_id = response.json()["id"]
-    #                 portfolio_ids.append(portfolio_id)
-    #                 break
-    #             elif 500 <= response.status_code < 600:
-    #                 # Retry for 500-level status codes
-    #                 if attempt < MAX_RETRIES - 1:
-    #                     backoff_time = 2 ** attempt  # Exponential backoff
-    #                     print(f"Portfolio creation failed with {response.status_code}, retrying in {backoff_time} seconds...")
-    #                     time.sleep(backoff_time)
-    #                 else:
-    #                     raise Exception(f"Failed to create portfolio after {MAX_RETRIES} attempts: {response.status_code} {response.reason}")
-    #             else:
-    #                 # Don't retry for non-500 status codes
-    #                 raise Exception(f"Failed to create portfolio: {response.status_code} {response.reason}")
-    #     return portfolio_ids
-
 
     def fund_portfolios_with_cash(self, portfolio_ids):
         # print("Funding portfolios with cash")
@@ -111,8 +65,7 @@ class EndToEndUser(HttpUser):
         # print("Creating model")
         response = create_models(self.client, self.securities, portfolio_ids, POSITIONS_PER_MODEL, len(portfolio_ids), 1)
         if response:
-            model_id = response[0]
-            return model_id
+            return response
         else:
             raise Exception(f"No models created.")
                 
@@ -188,44 +141,52 @@ class EndToEndUser(HttpUser):
     @task
     def run_sequential(self):
         time.sleep(random.uniform(1, 5))
+        # Create a group of portfolios
         portfolio_ids = post_portfolio_group(self.client)
         time.sleep(random.uniform(1, 5))
+        # Get each of them
+        for portfolio_id in portfolio_ids:
+            time.sleep(random.uniform(0, 2))
+            portal_client.get_portfolio(self.client, portfolio_id)
+        # Fund the portfolios
         funded_portfolio_ids = self.fund_portfolios_with_cash(portfolio_ids)
-        model_id = self.create_models_for_portfolios(funded_portfolio_ids)
+        # Create models for each funded portfolio
+        model_ids = self.create_models_for_portfolios(funded_portfolio_ids)
         time.sleep(random.uniform(1, 5))
-        rebalance_id = self.rebalance_models(model_id)
+        # Get the models
+        for model_id in model_ids:
+            time.sleep(random.uniform(0, 2))
+            portal_client.get_investment_model(self.client, model_id)
+        # Rebalance one of the models
+        time.sleep(random.uniform(1, 5))
+        rebalance_id = self.rebalance_models(model_ids[0])
+        # Submit the rebalance (send to the Order Service)
         time.sleep(random.uniform(1, 5))
         order_ids = self.submit_rebalance(rebalance_id)
         # Process order_ids in batches of max_orders
-        max_orders = 25
+        max_orders = 10
         for i in range(0, len(order_ids), max_orders):
             try:
                 batch_order_ids = order_ids[i:i+max_orders]
                 time.sleep(random.uniform(0, 2))
+                # Submit order (send to Trading Service)
                 submitted_order_ids = self.submit_orders(batch_order_ids) 
+                time.sleep(random.uniform(0, 2))
+                # Submit trades (send to Execution Service)
                 self.submit_trades(submitted_order_ids)
             except Exception as e:
                 print(f"Error submitting orders for batch {i}: {e}")
                 continue
-
-
-    # @task
-    def run_sequential_slow(self):
-        portfolio_ids = post_portfolio_group(self.client)
-        funded_portfolio_ids = self.fund_portfolios_with_cash(portfolio_ids)
-        model_id = self.create_models_for_portfolios(funded_portfolio_ids)
-        rebalance_id = self.rebalance_models(model_id)
-        order_ids = self.submit_rebalance(rebalance_id)
-        # Process order_ids in batches of max_orders
-        max_orders = 25
-        for i in range(0, len(order_ids), max_orders):
-            try:
-                batch_order_ids = order_ids[i:i+max_orders]
-                submitted_order_ids = self.submit_orders(batch_order_ids) 
-                self.submit_trades(submitted_order_ids)
-            except Exception as e:
-                print(f"Error submitting orders for batch {i}: {e}")
-                continue
+        # Get next 10 orders
+        time.sleep(random.uniform(0, 2))
+        portal_client.get_orders(self.client, offset=self.counter*10, limit=10)
+        # Get the next 10 trades
+        time.sleep(random.uniform(0, 2))
+        portal_client.get_trades(self.client, offset=self.counter*10, limit=10)
+        self.counter += 1
+        # Get executions for the first portfolio id
+        time.sleep(random.uniform(0, 2))
+        portal_client.get_executions(self.client, portfolio_id=portfolio_ids[0])
 
 
 
