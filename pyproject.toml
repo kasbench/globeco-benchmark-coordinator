@@ -5,6 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "gevent>=25.5.1",
+    "greenlet>=3.2.4",
     "jupyterlab>=4.4.5",
     "kr8s>=0.20.10",
     "locust>=2.37.14",

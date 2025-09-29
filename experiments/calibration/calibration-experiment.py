@@ -561,6 +561,15 @@ def initialize_environments_for_trial(trial,  replicas=1):
     states = get_microservice_states([{microservice: {"cpu_request": trial_cpu, "cpu_limit": trial_cpu}}])
     set_state(states, replicas)
     
+def cpu_equal(cpu1, cpu2):
+    if cpu1 == cpu2:
+        return True
+    if cpu1 == "1000m" and cpu2 == "1":
+        return True
+    if cpu1 == "1" and cpu2 == "1000m":
+        return True
+    return False 
+    
 def validate_environments(trial):
     microservice, trial_num, trial_length, trial_users, trial_cpu = trial
     for deployment in get_microservice_deployments():
@@ -569,14 +578,16 @@ def validate_environments(trial):
         spec = deployment.spec
         for container in spec['template']['spec']['containers']:
             if container['name'] == container.name:
-                print(f"Validating {container.name}")
+                # print(f"Validating {container.name}")
                 resources = container['resources']
-                print(f"Resources: {resources}")
+                # print(f"Resources: {resources}")
                 requests = resources['requests']
                 limits = resources['limits']
+                # assert cpu_equal(requests['cpu'], trial_cpu), "Requests CPU does not match" 
+                # assert cpu_equal(limits['cpu'], trial_cpu), "Limits CPU does not match"
                 if container['name'] == microservice:
-                    assert requests['cpu'] == trial_cpu
-                    assert limits['cpu'] == trial_cpu
+                    assert cpu_equal(requests['cpu'], trial_cpu), "Requests CPU does not match" 
+                    assert cpu_equal(limits['cpu'], trial_cpu), "Limits CPU does not match"
                 else:
                     assert requests['cpu'] == '1'   
                     assert limits['cpu'] == '1'
@@ -633,36 +644,36 @@ def run(bucket_name, replicas, selected_microservices, trial_numbers, trial_leng
     trial_lengths=trial_lengths, trial_users=trial_users, trial_cpus= trial_cpus)
     
     while trial := get_next_trial(minio_client, trials, bucket_name):
-        # try:
-        #     scale_microservice_deployments(0)
-        #     initialize_databases()
-        #     initialize_environments_for_trial(trial, replicas=replicas)
-        #     print("Environment Initialized.  Starting 30 second wait.")
-        #     time.sleep(30) # It will take at least this long.  Waiting leaves time for stabilization.
-        #     wait_for_all_rollouts()
-        #     validate_environments(trial)
-        #     time.sleep(10) # Stabilization
-        #     raw_output = run_trial(trial)
-        #     filename = make_file_name(trial)
-        #     save_to_minio(minio_client, raw_output, bucket_name, filename)
-        # except Exception as e:
-        #     print(f"Error in trial {trial}: {e}")
-        #     continue
+        try:
+            scale_microservice_deployments(0)
+            initialize_databases()
+            initialize_environments_for_trial(trial, replicas=replicas)
+            print("Environment Initialized.  Starting 30 second wait.")
+            time.sleep(30) # It will take at least this long.  Waiting leaves time for stabilization.
+            wait_for_all_rollouts()
+            validate_environments(trial)
+            time.sleep(10) # Stabilization
+            raw_output = run_trial(trial)
+            filename = make_file_name(trial)
+            save_to_minio(minio_client, raw_output, bucket_name, filename)
+        except Exception as e:
+            print(f"Error in trial {trial}: {e}")
+            continue
     
-        scale_microservice_deployments(0)
-        initialize_databases()
-        initialize_environments_for_trial(trial, replicas=replicas)
-        print("Environment Initialized.  Starting 30 second wait.")
-        time.sleep(30) # It will take at least this long.  Waiting leaves time for stabilization.
-        wait_for_all_rollouts()
-        validate_environments(trial)
-        time.sleep(10) # Stabilization
-        raw_output = run_trial(trial)
-        filename = make_file_name(trial)
-        save_to_minio(minio_client, raw_output, bucket_name, filename)
+        # scale_microservice_deployments(0)
+        # initialize_databases()
+        # initialize_environments_for_trial(trial, replicas=replicas)
+        # print("Environment Initialized.  Starting 30 second wait.")
+        # time.sleep(30) # It will take at least this long.  Waiting leaves time for stabilization.
+        # wait_for_all_rollouts()
+        # validate_environments(trial)
+        # time.sleep(10) # Stabilization
+        # raw_output = run_trial(trial)
+        # filename = make_file_name(trial)
+        # save_to_minio(minio_client, raw_output, bucket_name, filename)
 
 
-        break   #Temporary for testing    
+        # break   #Temporary for testing    
 
         
 if __name__ == "__main__": 
@@ -674,8 +685,8 @@ if __name__ == "__main__":
                  'globeco-portfolio-accounting-service', 'globeco-portfolio-management-portal', 
                  'globeco-portfolio-service', 'globeco-pricing-service', 'globeco-security-service',
                  'globeco-trade-service']
-    run(bucket_name="calibration-trials-raw", replicas=1, selected_microservices=selected_microservices, 
-        trial_numbers=[1, 2, 3, 4, 5, 6, 7], trial_lengths=["2m"], 
+    run(bucket_name="calibration-trials-raw-20250928", replicas=1, selected_microservices=selected_microservices, 
+        trial_numbers=[1, 2, 3, 4, 5, 6, 7], trial_lengths=["5m"], 
         trial_users=["1", "25", "50", "75", "100"],
         trial_cpus=["400m", "600m", "800m", "1000m"] )
         

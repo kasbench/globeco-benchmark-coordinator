@@ -109,3 +109,7 @@ Desktop.ini
 
 # Lock files
 uv.lock 
+
+
+# Miscellaneous
+experiments/calibration/run.out
