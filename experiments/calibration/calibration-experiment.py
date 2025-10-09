@@ -5,6 +5,7 @@ import json
 import os
 import tempfile
 import random
+from datetime import datetime, timedelta
 
 
 import kr8s
@@ -13,7 +14,8 @@ from minio import Minio
 from minio.error import S3Error
 
 import kafka_reinit_simple
-
+import ssh 
+import prometheus
 
 
 microservices = ['globeco-allocation-service', 'globeco-confirmation-service', 'globeco-execution-service', 
@@ -340,7 +342,14 @@ def get_trials(selected_microservices, trial_numbers=[0, 1, 2, 3, 4, 5, 6, 7], t
             for trial_user in trial_users
             for trial_cpu in trial_cpus]
     
-        
+
+def get_resource_trials(trial_numbers=list(range(30)), 
+        trial_lengths=["10m"], trial_users=["50"]):
+        return [(trial_num, trial_length, trial_user) 
+            for trial_num in trial_numbers
+            for trial_length in trial_lengths
+            for trial_user in trial_users]
+
 
 def file_count(minio_client, bucket_name):
     files = minio_client.list_objects(bucket_name, recursive=True)
@@ -376,6 +385,39 @@ def get_next_trial(minio_client, trials, bucket_name):
         filename = make_file_name(trial)
         if not file_exists(minio_client, bucket_name, filename):
             return trial
+
+def make_resource_trial_file_name(trial, extension):
+    trial_num, trial_length, trial_workers = trial
+    return f"trial-{trial_workers}-{trial_length}-{trial_num}{extension}"
+
+def get_next_resource_trial(
+            minio_client, 
+            trials, 
+            log_bucket_name,
+            log_extension,
+            metric_bucket_names,
+            metric_extensions):
+
+    number_of_trials = len(trials)        
+    all_buckets = [log_bucket_name] + metric_bucket_names
+    all_extensions = [log_extension] + metric_extensions
+
+    # Check to see if we have already completed all trials
+    counter = 0
+    for bucket_name in all_buckets:    
+        if file_count(minio_client, bucket_name) >= number_of_trials:
+            counter += 1
+    if counter == len(all_buckets):
+        return None
+    
+    # If not, pick one that has not been completed
+    while True:
+        trial = random.choice(trials)
+        for bucket_name, extension in zip(all_buckets, all_extensions):
+            filename = make_resource_trial_file_name(trial, extension)
+            # If any file in the trial doesn't exist, we will rerun
+            if not file_exists(minio_client, bucket_name, filename):
+                return trial
 
 def restore_postgres(service_name):
     print(f"Restoring {service_name}")
@@ -560,7 +602,12 @@ def initialize_environments_for_trial(trial,  replicas=1):
     # override the default state with the trial parameters
     states = get_microservice_states([{microservice: {"cpu_request": trial_cpu, "cpu_limit": trial_cpu}}])
     set_state(states, replicas)
-    
+
+def initialize_environments_for_resource_trial(trial,  replicas=1):
+    states = get_microservice_states([])
+    set_state(states, replicas)
+
+
 def cpu_equal(cpu1, cpu2):
     if cpu1 == cpu2:
         return True
@@ -622,6 +669,14 @@ def run_trial(trial):
     raw_output = run_test_in_kubernetes(time_expression=trial_length, user_count=trial_users, spawn_rate=trial_users, verbose=False)
     return raw_output
 
+
+def run_resource_trial(trial, verbose=False):
+    trial_num, trial_length, trial_users = trial
+    print(f"Running trial number {trial_num} for {trial_length} using {trial_users} users.")
+    raw_output = run_test_in_kubernetes(time_expression=trial_length, user_count=trial_users, spawn_rate=trial_users, verbose=verbose)
+    return raw_output
+
+
 def save_to_minio(minio_client, output, bucket_name, filename):
     print(f"Saving {bucket_name}/{filename}")
     with tempfile.NamedTemporaryFile(mode='w+', delete=True) as tmp:
@@ -675,7 +730,78 @@ def run(bucket_name, replicas, selected_microservices, trial_numbers, trial_leng
 
         # break   #Temporary for testing    
 
+
+def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices, trial_numbers, trial_lengths, 
+                                    trial_users):
+    
+    minio_client = Minio(
+        "minio:9000",  
+        access_key= os.environ['MINIO_ACCESS_KEY'],
+        secret_key= os.environ['MINIO_SECRET_KEY'],
+        secure=False  # Set to True for production with TLS
+    )
+
+    metrics = ["container_cpu_usage_seconds_total", "container_cpu_cfs_throttled_seconds_total", 
+                "container_memory_working_set_bytes"]
+    calculate_rates = [True, True, False]
+    extensions = ["-logs.json", "-cpu-usage.parquet", "-cpu-throttled.parquet", "-memory-wsb.parquet"]
+    log_extension = extensions[0]
+    metric_extensions = extensions[1:]
+    bucket_extensions = ["-logs-raw", "-cpu-usage", "-cpu-throttled", "-memory-wsb"]
+    bucket_names = [f"{bucket_name_prefix}{bucket_extension}" for bucket_extension in bucket_extensions]
+    log_bucket_name = bucket_names[0]
+    metric_bucket_names = bucket_names[1:]
+
+    for bucket_name in bucket_names:
+        ensure_bucket_exists(minio_client, bucket_name)
+
+    trials = get_resource_trials(
+            trial_numbers=trial_numbers, 
+            trial_lengths=trial_lengths, 
+            trial_users=trial_users)
+    
+    while trial := get_next_resource_trial(
+            minio_client, 
+            trials, 
+            log_bucket_name,
+            log_extension,
+            metric_bucket_names,
+            metric_extensions):
+        try:
+            # scale_microservice_deployments(0)
+            # initialize_databases()
+            # initialize_environments_for_resource_trial(trial, replicas=replicas)
+            # print("Environment Initialized.  Starting 30 second wait.")
+            # time.sleep(30) # It will take at least this long.  Waiting leaves time for stabilization.
+            # wait_for_all_rollouts()
+            # # validate_environments(trial)
+            time.sleep(10) # Stabilization
+            start_time = datetime.now()
+            print(f"Start time: {start_time.strftime("%Y-%m-%d %H:%M:%S")}")
+            raw_output = run_resource_trial(trial)
+            end_time = datetime.now()
+            print(f"End time: {end_time.strftime("%Y-%m-%d %H:%M:%S")}")
+            filename = make_resource_trial_file_name(trial, log_extension)
+            save_to_minio(minio_client, raw_output, log_bucket_name, filename)
+            for metric, metric_bucket_name, metric_extension, calculate_rate in zip(metrics, metric_bucket_names, metric_extensions, calculate_rates):
+                prom = prometheus.get_prometheus_connection()
+                prometheus_data = prometheus.get_prometheus_data(prom, microservices, metric, start_time, end_time, calculate_rate=calculate_rate)
+                filename = make_resource_trial_file_name(trial, metric_extension)
+                prometheus_data.to_parquet(filename)
+                minio_client.fput_object(metric_bucket_name, filename, filename)
+                os.remove(filename)
+        except Exception as e:
+            print(f"Error in trial {trial}: {e}")
+            continue
+    
         
+
+        # break   #Temporary for testing    
+
+
+
+
+
 if __name__ == "__main__": 
 
     # Excluding globeco-order-generation-service from the calibration due to its unique nature.  Fixed at 2000m.
@@ -685,9 +811,19 @@ if __name__ == "__main__":
                  'globeco-portfolio-accounting-service', 'globeco-portfolio-management-portal', 
                  'globeco-portfolio-service', 'globeco-pricing-service', 'globeco-security-service',
                  'globeco-trade-service']
-    run(bucket_name="calibration-trials-raw-20250928", replicas=1, selected_microservices=selected_microservices, 
-        trial_numbers=[1, 2, 3, 4, 5, 6, 7], trial_lengths=["5m"], 
-        trial_users=["1", "25", "50", "75", "100"],
-        trial_cpus=["400m", "600m", "800m", "1000m"] )
+    
+    microservices = selected_microservices + ['globeco-order-generation-service']
+
+    # run(bucket_name="calibration-trials-raw-20250928", replicas=1, selected_microservices=selected_microservices, 
+    #     trial_numbers=[1, 2, 3, 4, 5, 6, 7], trial_lengths=["5m"], 
+    #     trial_users=["1", "25", "50", "75", "100"],
+    #     trial_cpus=["400m", "600m", "800m", "1000m"] )
+        
+    run_resource_utilization_sample(bucket_name_prefix="calibration-trials-test-20251009", 
+        replicas=1, 
+        microservices=microservices,
+        trial_numbers=[0, 1], trial_lengths=["1m"], 
+        trial_users=["50"])
+         
         
     
