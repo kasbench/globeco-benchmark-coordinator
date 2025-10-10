@@ -741,13 +741,13 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
         secure=False  # Set to True for production with TLS
     )
 
-    metrics = ["container_cpu_usage_seconds_total", "container_cpu_cfs_throttled_seconds_total", 
+    metrics = ["container_cpu_usage_seconds_total", "container_cpu_usage_seconds_total", "container_cpu_cfs_throttled_seconds_total", 
                 "container_memory_working_set_bytes"]
-    calculate_rates = [True, True, False]
-    extensions = ["-logs.json", "-cpu-usage.parquet", "-cpu-throttled.parquet", "-memory-wsb.parquet"]
+    calculate_rates = [True, False, True, False]
+    extensions = ["-logs.json", "-cpu-usage.parquet", "-cpu-usage-raw.parquet", "-cpu-throttled.parquet", "-memory-wsb.parquet"]
     log_extension = extensions[0]
     metric_extensions = extensions[1:]
-    bucket_extensions = ["-logs-raw", "-cpu-usage", "-cpu-throttled", "-memory-wsb"]
+    bucket_extensions = ["-logs-raw", "-cpu-usage", "-cpu-usage-raw", "-cpu-throttled", "-memory-wsb"]
     bucket_names = [f"{bucket_name_prefix}{bucket_extension}" for bucket_extension in bucket_extensions]
     log_bucket_name = bucket_names[0]
     metric_bucket_names = bucket_names[1:]
@@ -759,6 +759,8 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
             trial_numbers=trial_numbers, 
             trial_lengths=trial_lengths, 
             trial_users=trial_users)
+
+    ssh.set_cpu_governor_to_performance()
     
     while trial := get_next_resource_trial(
             minio_client, 
@@ -768,13 +770,13 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
             metric_bucket_names,
             metric_extensions):
         try:
-            # scale_microservice_deployments(0)
-            # initialize_databases()
-            # initialize_environments_for_resource_trial(trial, replicas=replicas)
-            # print("Environment Initialized.  Starting 30 second wait.")
-            # time.sleep(30) # It will take at least this long.  Waiting leaves time for stabilization.
-            # wait_for_all_rollouts()
-            # # validate_environments(trial)
+            scale_microservice_deployments(0)
+            initialize_databases()
+            initialize_environments_for_resource_trial(trial, replicas=replicas)
+            print("Environment Initialized.  Starting 30 second wait.")
+            time.sleep(30) # It will take at least this long.  Waiting leaves time for stabilization.
+            wait_for_all_rollouts()
+            # validate_environments(trial)
             time.sleep(10) # Stabilization
             start_time = datetime.now()
             print(f"Start time: {start_time.strftime("%Y-%m-%d %H:%M:%S")}")
@@ -793,8 +795,8 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
         except Exception as e:
             print(f"Error in trial {trial}: {e}")
             continue
-    
-        
+            
+    ssh.set_cpu_governor_to_performance(revert=True)    
 
         # break   #Temporary for testing    
 
@@ -819,11 +821,11 @@ if __name__ == "__main__":
     #     trial_users=["1", "25", "50", "75", "100"],
     #     trial_cpus=["400m", "600m", "800m", "1000m"] )
         
-    run_resource_utilization_sample(bucket_name_prefix="calibration-trials-test-20251009", 
+    run_resource_utilization_sample(bucket_name_prefix="calibration-20251010", 
         replicas=1, 
         microservices=microservices,
-        trial_numbers=[0, 1], trial_lengths=["1m"], 
+        trial_numbers=list(range(90)), trial_lengths=["10m"], 
         trial_users=["50"])
-         
+        
         
     
