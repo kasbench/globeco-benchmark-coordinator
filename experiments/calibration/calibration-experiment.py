@@ -408,6 +408,7 @@ def get_next_resource_trial(
         if file_count(minio_client, bucket_name) >= number_of_trials:
             counter += 1
     if counter == len(all_buckets):
+        print(f"All {number_of_trials} trials completed")
         return None
     
     # If not, pick one that has not been completed
@@ -824,7 +825,7 @@ if __name__ == "__main__":
     run_resource_utilization_sample(bucket_name_prefix="calibration-20251010", 
         replicas=1, 
         microservices=microservices,
-        trial_numbers=list(range(90)), trial_lengths=["10m"], 
+        trial_numbers=list(range(96)), trial_lengths=["10m"], 
         trial_users=["50"])
         
         
