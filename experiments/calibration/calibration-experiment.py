@@ -26,6 +26,38 @@ microservices = ['globeco-allocation-service', 'globeco-confirmation-service', '
 
 namespace="globeco"
 
+NODES = (('server', 4, 'rpi'),
+         ('node-0', 4, 'rpi'),
+         ('node-1', 4, 'rpi'),
+         ('node-2', 4, 'rpi'),
+         ('node-3', 16, 'amd'),
+         ('node-4', 16, 'amd'),
+         ('node-5', 16, 'amd'),
+        )
+
+METRICS = {
+    "k10temp-pci-00c3": "AMD CPU Temperature",
+    "amdgpu-pci-0400": "AMD GPU Temperature",
+    "acpitz-acpi-0": "Ambiant Temperature",
+    "nvme-pci-0100": "NVMe Temperature",
+    "cpu_thermal-virtual-0": "RPI CPU Temperature",
+    "rp1_adc-isa-0000": "RPI ADC Temperature",
+    "nvme-pci-10100": "NVMe Temperature"
+}
+
+NODE_METRICS = {
+    "server": ["cpu_thermal-virtual-0", "rp1_adc-isa-0000", "nvme-pci-10100"],
+    "node-0": ["cpu_thermal-virtual-0", "rp1_adc-isa-0000", "nvme-pci-10100"],
+    "node-1": ["cpu_thermal-virtual-0", "rp1_adc-isa-0000", "nvme-pci-10100"],
+    "node-2": ["cpu_thermal-virtual-0", "rp1_adc-isa-0000", "nvme-pci-10100"],
+    "node-3": ["k10temp-pci-00c3", "amdgpu-pci-0400", "acpitz-acpi-0", "nvme-pci-0100"],
+    "node-4": ["k10temp-pci-00c3", "amdgpu-pci-0400", "acpitz-acpi-0", "nvme-pci-0100"],
+    "node-5": ["k10temp-pci-00c3", "amdgpu-pci-0400", "acpitz-acpi-0", "nvme-pci-0100"],
+}
+
+
+
+
 def get_pods():
     return kr8s.get("pods", namespace=namespace)
 
@@ -750,6 +782,7 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
     metric_extensions = extensions[1:]
     bucket_extensions = ["-logs-raw", "-cpu-usage", "-cpu-usage-raw", "-cpu-throttled", "-memory-wsb"]
     bucket_names = [f"{bucket_name_prefix}{bucket_extension}" for bucket_extension in bucket_extensions]
+    node_bucket_name = f"{bucket_name_prefix}-node"
     log_bucket_name = bucket_names[0]
     metric_bucket_names = bucket_names[1:]
 
@@ -793,6 +826,16 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
                 prometheus_data.to_parquet(filename)
                 minio_client.fput_object(metric_bucket_name, filename, filename)
                 os.remove(filename)
+            for node, metrics in NODE_METRICS.items():
+                for metric in metrics:
+                    prom = prometheus.get_prometheus_connection()
+                    prometheus_data = prometheus.get_prometheus_node_data(prom, node, metric, start_time, end_time)
+                    filename = make_resource_trial_file_name(trial, f"{node}-{metric}.parquet")
+                    prometheus_data.to_parquet(filename)
+                    minio_client.fput_object(node_bucket_name, filename, filename)
+                    os.remove(filename)
+                
+
         except Exception as e:
             print(f"Error in trial {trial}: {e}")
             continue

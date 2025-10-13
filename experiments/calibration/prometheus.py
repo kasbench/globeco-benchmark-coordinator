@@ -43,6 +43,24 @@ def get_prometheus_data(prom, microservices, metric_name, start_time, end_time, 
     return df
 
 
+def get_prometheus_node_data(prom, node, metric_name, start_time, end_time,  namespace="monitor", steps="15s", verbose=False ):
+    
+    query = f'{metric_name}{{node="{node}"}}'
+    if verbose:
+        print(query) 
+    
+    data = prom.custom_query_range(
+        query=query,
+        start_time=start_time,
+        end_time=end_time,
+        step=steps
+    )
+    
+    df = MetricRangeDataFrame(data)
+    
+    return df
+
+
 
 
 
