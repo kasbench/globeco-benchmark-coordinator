@@ -6,6 +6,8 @@ import os
 import tempfile
 import random
 from datetime import datetime, timedelta
+import traceback
+from zoneinfo import ZoneInfo
 
 
 import kr8s
@@ -16,6 +18,8 @@ from minio.error import S3Error
 import kafka_reinit_simple
 import ssh 
 import prometheus
+
+eastern_tz = ZoneInfo("America/New_York")
 
 
 microservices = ['globeco-allocation-service', 'globeco-confirmation-service', 'globeco-execution-service', 
@@ -45,14 +49,15 @@ METRICS = {
     "nvme-pci-10100": "NVMe Temperature"
 }
 
+# Metrics to collect from each node.  Underscores are used in place of dashes for Prometheus queries.
 NODE_METRICS = {
-    "server": ["cpu_thermal-virtual-0", "rp1_adc-isa-0000", "nvme-pci-10100"],
-    "node-0": ["cpu_thermal-virtual-0", "rp1_adc-isa-0000", "nvme-pci-10100"],
-    "node-1": ["cpu_thermal-virtual-0", "rp1_adc-isa-0000", "nvme-pci-10100"],
-    "node-2": ["cpu_thermal-virtual-0", "rp1_adc-isa-0000", "nvme-pci-10100"],
-    "node-3": ["k10temp-pci-00c3", "amdgpu-pci-0400", "acpitz-acpi-0", "nvme-pci-0100"],
-    "node-4": ["k10temp-pci-00c3", "amdgpu-pci-0400", "acpitz-acpi-0", "nvme-pci-0100"],
-    "node-5": ["k10temp-pci-00c3", "amdgpu-pci-0400", "acpitz-acpi-0", "nvme-pci-0100"],
+    "server": ["cpu_thermal_virtual_0", "rp1_adc_isa_0000", "nvme_pci_10100"],
+    "node-0": ["cpu_thermal_virtual_0", "rp1_adc_isa_0000", "nvme_pci_10100"],
+    "node-1": ["cpu_thermal_virtual_0", "rp1_adc_isa_0000", "nvme_pci_10100"],
+    "node-2": ["cpu_thermal_virtual_0", "rp1_adc_isa_0000", "nvme_pci_10100"],
+    "node-3": ["k10temp_pci_00c3", "amdgpu_pci_0400", "acpitz_acpi_0", "nvme_pci_0100"],
+    "node-4": ["k10temp_pci_00c3", "amdgpu_pci_0400", "acpitz_acpi_0", "nvme_pci_0100"],
+    "node-5": ["k10temp_pci_00c3", "amdgpu_pci_0400", "acpitz_acpi_0", "nvme_pci_0100"],
 }
 
 
@@ -788,6 +793,7 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
 
     for bucket_name in bucket_names:
         ensure_bucket_exists(minio_client, bucket_name)
+    ensure_bucket_exists(minio_client, node_bucket_name)
 
     trials = get_resource_trials(
             trial_numbers=trial_numbers, 
@@ -826,24 +832,66 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
                 prometheus_data.to_parquet(filename)
                 minio_client.fput_object(metric_bucket_name, filename, filename)
                 os.remove(filename)
-            for node, metrics in NODE_METRICS.items():
-                for metric in metrics:
+            for node, node_metrics in NODE_METRICS.items():
+                for metric in node_metrics:
                     prom = prometheus.get_prometheus_connection()
-                    prometheus_data = prometheus.get_prometheus_node_data(prom, node, metric, start_time, end_time)
-                    filename = make_resource_trial_file_name(trial, f"{node}-{metric}.parquet")
+                    prometheus_data = prometheus.get_prometheus_node_data(prom, node, metric, start_time, end_time, verbose=False)
+                    filename = make_resource_trial_file_name(trial, f"-{node}-{metric}.parquet")
                     prometheus_data.to_parquet(filename)
                     minio_client.fput_object(node_bucket_name, filename, filename)
                     os.remove(filename)
                 
 
         except Exception as e:
-            print(f"Error in trial {trial}: {e}")
+            print(f"Error in trial {trial}: {e}.\n{traceback.format_exc()}")
             continue
             
     ssh.set_cpu_governor_to_performance(revert=True)    
 
         # break   #Temporary for testing    
 
+
+def run_baseline_idle_sample(bucket_name, num_trials, trial_length):
+    
+    minio_client = Minio(
+        "minio:9000",  
+        access_key= os.environ['MINIO_ACCESS_KEY'],
+        secret_key= os.environ['MINIO_SECRET_KEY'],
+        secure=False  # Set to True for production with TLS
+    )
+    
+    ensure_bucket_exists(minio_client, bucket_name)
+
+    start_time = datetime(2025, 10, 16, 20, 47, 39, tzinfo=eastern_tz)
+
+    for i in range(num_trials):
+        end_time = start_time + timedelta(minutes=trial_length)
+        # trial = (i, f"{trial_length}m", "0")
+        trial_success = False
+        fail_count = 0
+        while not trial_success:
+            try:
+                for node, node_metrics in NODE_METRICS.items():
+                    for metric in node_metrics:
+                        prom = prometheus.get_prometheus_connection()
+                        prometheus_data = prometheus.get_prometheus_node_data(prom, node, metric, start_time, end_time, verbose=False)
+                        filename = f"trial-{i}-idle-{node}-{metric}.parquet"
+                        prometheus_data.to_parquet(filename)
+                        minio_client.fput_object(bucket_name, filename, filename)
+                        os.remove(filename)
+                trial_success = True
+            except Exception as e:
+                print(f"Error in trial {i}: {e}.\n{traceback.format_exc()}")
+                fail_count += 1
+                if fail_count >= 5:
+                    print(f"Trial {i} failed 5 times.  Skipping.")
+                    break
+                print(f"Retrying trial {i} after 10 seconds.")
+                time.sleep(10)
+
+        print(f"Completed idle trial {i} from {start_time} to {end_time}")                
+        start_time = end_time + timedelta(minutes=2, seconds=30)  # 2 minute 30 second gap between trials
+                
 
 
 
@@ -865,11 +913,11 @@ if __name__ == "__main__":
     #     trial_users=["1", "25", "50", "75", "100"],
     #     trial_cpus=["400m", "600m", "800m", "1000m"] )
         
-    run_resource_utilization_sample(bucket_name_prefix="calibration-20251010", 
+    run_resource_utilization_sample(bucket_name_prefix="calibration-20251013", 
         replicas=1, 
         microservices=microservices,
-        trial_numbers=list(range(96)), trial_lengths=["10m"], 
+        trial_numbers=list(range(200)), trial_lengths=["10m"], 
         trial_users=["50"])
         
-        
+    # run_baseline_idle_sample("calibration-20251019-idle", 200, 10)
     

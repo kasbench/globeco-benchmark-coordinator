@@ -13,6 +13,8 @@ def get_prometheus_connection(url="http://prometheus:31565", disable_ssl=True):
 
 
 def get_prometheus_data(prom, microservices, metric_name, start_time, end_time, calculate_rate=True, namespace="globeco", range="1m", steps="10s", verbose=False ):
+    if verbose:
+        print(f"Getting Prometheus data for {metric_name} from {start_time} to {end_time}")
     df = None
     pods = []
     for microservice in microservices:
@@ -32,14 +34,15 @@ def get_prometheus_data(prom, microservices, metric_name, start_time, end_time, 
             end_time=end_time,
             step=steps
         )
-        
+        if verbose:
+            print(f"Retrieved {len(data)} data points for {microservice} ({pod.name})")
         temp_df = MetricRangeDataFrame(data)
         temp_df['pod'] = microservice
         if df is None:
             df = temp_df
         else:
             df = pd.concat([df, temp_df], axis = 0)
-
+    print("Returning dataframe with shape:", df.shape)    
     return df
 
 
