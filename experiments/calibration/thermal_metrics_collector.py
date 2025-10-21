@@ -76,6 +76,8 @@ NODES = (('server', 4, 'rpi'),
          ('node-5', 16, 'amd'),
         )
 
+NODE_CPU = {node: cpu for node, _, cpu in NODES}
+
 METRICS = {
     "k10temp-pci-00c3": "AMD CPU Temperature",
     "amdgpu-pci-0400": "AMD GPU Temperature",
@@ -104,6 +106,30 @@ def get_all_thermals_for_nodes(nodes, command, timeout=5):
             
     raise Exception(f"Failed to get thermals after 3 attempts: {exceptions}")
 
+def get_thermals_for_request(request, command="sensors -j", timeout=5):
+    """
+    Collects temperatures based on a request dictionary.  The request dictionary is in the form:
+        {"node-1": [metric1, metric2],
+         "node-2": [metric1, metric3], 
+         ...}
+    """
+    thermal_record = []
+    exceptions = []
+    for _ in range(3):       # Retry up to 3 times
+        try:
+            for node, metrics in request.items():
+                client = get_ssh_client(node, timeout=timeout)
+                raw_thermals = get_thermals(client, command=command, timeout=timeout)
+                if processed_thermals := preprocess_thermals(raw_thermals, NODE_CPU[node], node):
+                    thermal_record.append(processed_thermals)
+                client.close()
+            # print(f"Thermal record: {thermal_record}")
+            return thermal_record
+        except Exception as ex:
+            exceptions.append(ex)
+            time.sleep(10)
+
+    raise Exception(f"Failed to get thermals after 3 attempts: {exceptions}")
 
 
 class MetricPusher:

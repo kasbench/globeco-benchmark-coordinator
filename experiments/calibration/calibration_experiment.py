@@ -8,7 +8,8 @@ import random
 from datetime import datetime, timedelta
 import traceback
 from zoneinfo import ZoneInfo
-
+import pickle
+from collections import defaultdict
 
 import kr8s
 from kr8s.objects import Pod, Deployment, StatefulSet
@@ -18,6 +19,7 @@ from minio.error import S3Error
 import kafka_reinit_simple
 import ssh 
 import prometheus
+import thermal_metrics_collector
 
 eastern_tz = ZoneInfo("America/New_York")
 
@@ -235,6 +237,49 @@ def parse_locust_output(output_string):
             return None
 
     return None
+
+def get_threshold_lookup(file="./threshold_lookup.pkl"):
+    if os.path.exists(file):
+        with open(file, "rb") as f:
+            threshold_lookup = pickle.load(f)
+            for (node, metric), value in threshold_lookup.items():
+                threshold_lookup[(node, metric)] = float(value)
+        return threshold_lookup
+    else:
+        return None
+
+
+def wait_for_cooling(threshold_lookup, max_wait_seconds=600):
+    completed_node_metrics = []
+    start_time  = time.time()
+    while True:
+        request = defaultdict(list)
+        for (node, metric), value in threshold_lookup.items():
+            if (node, metric) not in completed_node_metrics:
+                request[node].append(metric)
+                # print(f"Still need {metric} for {node}")
+        if len(request) == 0:
+            break
+        
+        results = thermal_metrics_collector.get_thermals_for_request(request)
+
+        for result in results:
+            node, _ , metrics = result
+            if node == "server":
+                continue
+            for metric, value in metrics.items():
+                metric = metric.replace("-", "_")
+                if metric in ["acpitz_acpi_0", "nvme_pci_0100", "nvme_pci_10100"]:      # Excluding 
+                    continue  
+                if value <= threshold_lookup[(node, metric)]:
+                    completed_node_metrics.append((node, metric))
+                else: 
+                    print(f"Node {node} metric {metric} value {value} not below threshold {threshold_lookup[(node, metric)]}")
+
+        if time.time() - start_time > max_wait_seconds:
+            raise TimeoutError("Timed out waiting for cooling to complete.")
+        print("Sleeping for 15 seconds (waitng for cooling)")
+        time.sleep(15)
 
 
 def run_test(tag, time_expression="5m", user_count="1", spawn_rate="1", verbose=False):
@@ -769,6 +814,47 @@ def run(bucket_name, replicas, selected_microservices, trial_numbers, trial_leng
         # break   #Temporary for testing    
 
 
+def run_fixed_size(bucket_name, replicas, selected_microservices, trial_numbers, trial_lengths, trial_users, trial_cpus):
+    # The purpose of this test is to find the maximum number of concurrent users
+    
+    minio_client = Minio(
+        "minio:9000",  
+        access_key= os.environ['MINIO_ACCESS_KEY'],
+        secret_key= os.environ['MINIO_SECRET_KEY'],
+        secure=False  # Set to True for production with TLS
+    )
+
+    ensure_bucket_exists(minio_client, bucket_name)
+
+    trials = get_trials(["aggregate"], trial_numbers=trial_numbers, 
+    trial_lengths=trial_lengths, trial_users=trial_users, trial_cpus= trial_cpus)
+    
+    threshold_lookup = get_threshold_lookup()
+
+
+    while trial := get_next_trial(minio_client, trials, bucket_name):
+        try:
+            scale_microservice_deployments(0)
+            initialize_databases()
+            initialize_environments_for_resource_trial(trial, replicas=replicas)
+            print("Environment Initialized.  Starting 30 second wait.")
+            time.sleep(30) # It will take at least this long.  Waiting leaves time for stabilization.
+            wait_for_all_rollouts()
+            # validate_environments(trial)
+            time.sleep(10) # Stabilization
+            print("Wait up to 5 minutes for cooling")
+            wait_for_cooling(threshold_lookup)
+            raw_output = run_trial(trial)
+            filename = make_file_name(trial)
+            save_to_minio(minio_client, raw_output, bucket_name, filename)
+        except Exception as e:
+            print(f"Error in trial {trial}: {e}.\n{traceback.format_exc()}")
+            continue
+    
+
+
+
+
 def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices, trial_numbers, trial_lengths, 
                                     trial_users):
     
@@ -908,16 +994,16 @@ if __name__ == "__main__":
     
     microservices = selected_microservices + ['globeco-order-generation-service']
 
-    # run(bucket_name="calibration-trials-raw-20250928", replicas=1, selected_microservices=selected_microservices, 
-    #     trial_numbers=[1, 2, 3, 4, 5, 6, 7], trial_lengths=["5m"], 
-    #     trial_users=["1", "25", "50", "75", "100"],
-    #     trial_cpus=["400m", "600m", "800m", "1000m"] )
+    run_fixed_size(bucket_name="calibration-trials-raw-20250928", replicas=1, selected_microservices=selected_microservices, 
+        trial_numbers=list(range(30)), trial_lengths=["5m"], 
+        trial_users=["25", "50", "75", "100"],
+        trial_cpus=["1000m"] )
         
-    run_resource_utilization_sample(bucket_name_prefix="calibration-20251013", 
-        replicas=1, 
-        microservices=microservices,
-        trial_numbers=list(range(200)), trial_lengths=["10m"], 
-        trial_users=["50"])
+    # run_resource_utilization_sample(bucket_name_prefix="calibration-20251013", 
+    #     replicas=1, 
+    #     microservices=microservices,
+    #     trial_numbers=list(range(200)), trial_lengths=["10m"], 
+    #     trial_users=["50"])
         
     # run_baseline_idle_sample("calibration-20251019-idle", 200, 10)
     
