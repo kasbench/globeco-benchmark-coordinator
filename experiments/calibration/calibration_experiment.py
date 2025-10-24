@@ -647,7 +647,7 @@ def initialize_databases():
 
     # globeco-fix-engine-postgresql
     # restore_postgres("globeco-fix-engine-postgresql")
-    clean_postgres("globeco-fix-engine-postgresql", "postgres-fix-engine", "node-0")
+    clean_postgres("globeco-fix-engine-postgresql", "fix-engine-postgres", "node-0")
 
     # globeco-order-generation-service-mongodb
     # restore_mongo("globeco-order-generation-service-mongodb")
