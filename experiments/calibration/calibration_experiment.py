@@ -253,15 +253,18 @@ def wait_for_cooling(threshold_lookup, max_wait_seconds=600):
     completed_node_metrics = []
     start_time  = time.time()
     while True:
+        
         request = defaultdict(list)
         for (node, metric), value in threshold_lookup.items():
             if (node, metric) not in completed_node_metrics:
                 request[node].append(metric)
                 # print(f"Still need {metric} for {node}")
-        if len(request) == 0:
-            break
+        if len(request) == 0:  # This should never happen here, since we check at the end of the loop
+            return
         
+        print(f"Requesting thermal metrics for: {dict(request)}")
         results = thermal_metrics_collector.get_thermals_for_request(request)
+        print(f"Thermal results: {results}")
 
         for result in results:
             node, _ , metrics = result
@@ -276,6 +279,15 @@ def wait_for_cooling(threshold_lookup, max_wait_seconds=600):
                 else: 
                     print(f"Node {node} metric {metric} value {value} not below threshold {threshold_lookup[(node, metric)]}")
 
+        # Check if all node-metrics have completed
+        request = defaultdict(list)
+        for (node, metric), value in threshold_lookup.items():
+            if (node, metric) not in completed_node_metrics:
+                request[node].append(metric)
+                # print(f"Still need {metric} for {node}")
+        if len(request) == 0:
+            return
+        
         if time.time() - start_time > max_wait_seconds:
             raise TimeoutError("Timed out waiting for cooling to complete.")
         print("Sleeping for 15 seconds (waitng for cooling)")
@@ -666,7 +678,7 @@ def initialize_databases():
     time.sleep(22)
 
     # cleanup node debugger pods.  
-    kafka_reinit_simple.delete_node_debugger_pods()
+    # kafka_reinit_simple.delete_node_debugger_pods()
 
 
 def set_state(states, replicas):
@@ -836,6 +848,7 @@ def run_fixed_size(bucket_name, replicas, selected_microservices, trial_numbers,
         try:
             scale_microservice_deployments(0)
             initialize_databases()
+            adfasdfsdaffd
             initialize_environments_for_resource_trial(trial, replicas=replicas)
             print("Environment Initialized.  Starting 30 second wait.")
             time.sleep(30) # It will take at least this long.  Waiting leaves time for stabilization.
@@ -856,7 +869,7 @@ def run_fixed_size(bucket_name, replicas, selected_microservices, trial_numbers,
 
 
 def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices, trial_numbers, trial_lengths, 
-                                    trial_users):
+                                    trial_users, wait_for_cooling_before_run=False ):
     
     minio_client = Minio(
         "minio:9000",  
@@ -864,6 +877,8 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
         secret_key= os.environ['MINIO_SECRET_KEY'],
         secure=False  # Set to True for production with TLS
     )
+
+    threshold_lookup = get_threshold_lookup()
 
     metrics = ["container_cpu_usage_seconds_total", "container_cpu_usage_seconds_total", "container_cpu_cfs_throttled_seconds_total", 
                 "container_memory_working_set_bytes"]
@@ -886,7 +901,7 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
             trial_lengths=trial_lengths, 
             trial_users=trial_users)
 
-    ssh.set_cpu_governor_to_performance()
+    ssh.set_cpu_governor_to_performance(revert=True) ## Ensure we start in default state
     
     while trial := get_next_resource_trial(
             minio_client, 
@@ -896,18 +911,24 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
             metric_bucket_names,
             metric_extensions):
         try:
+            ssh.set_cpu_governor_to_performance(revert=True)
             scale_microservice_deployments(0)
             initialize_databases()
             initialize_environments_for_resource_trial(trial, replicas=replicas)
-            print("Environment Initialized.  Starting 30 second wait.")
-            time.sleep(30) # It will take at least this long.  Waiting leaves time for stabilization.
+            print("Environment Initialized.  Starting 60 second wait.")
+            time.sleep(60) # It will take at least this long.  Waiting leaves time for stabilization.
             wait_for_all_rollouts()
             # validate_environments(trial)
             time.sleep(10) # Stabilization
+            print("Wait up to 5 minutes for cooling")
+            if wait_for_cooling_before_run: 
+                wait_for_cooling(threshold_lookup)
+            ssh.set_cpu_governor_to_performance()
             start_time = datetime.now()
             print(f"Start time: {start_time.strftime("%Y-%m-%d %H:%M:%S")}")
             raw_output = run_resource_trial(trial)
             end_time = datetime.now()
+            ssh.set_cpu_governor_to_performance(revert=True)    
             print(f"End time: {end_time.strftime("%Y-%m-%d %H:%M:%S")}")
             filename = make_resource_trial_file_name(trial, log_extension)
             save_to_minio(minio_client, raw_output, log_bucket_name, filename)
@@ -994,16 +1015,36 @@ if __name__ == "__main__":
     
     microservices = selected_microservices + ['globeco-order-generation-service']
 
-    run_fixed_size(bucket_name="calibration-trials-raw-20250928", replicas=1, selected_microservices=selected_microservices, 
-        trial_numbers=list(range(30)), trial_lengths=["5m"], 
-        trial_users=["25", "50", "75", "100"],
-        trial_cpus=["1000m"] )
+    # The following was abandoned in favor of run_resource_utilization_sample with modifications
+    # run_fixed_size(bucket_name="experiment-2-20251021-raw", replicas=1, selected_microservices=selected_microservices, 
+    #     trial_numbers=list(range(30)), trial_lengths=["10m"], 
+    #     trial_users=["25", "50", "75", "100"],
+    #     trial_cpus=["1000m"] )
         
+    # The following runs were used for experiment 1 calibration data collection.
     # run_resource_utilization_sample(bucket_name_prefix="calibration-20251013", 
     #     replicas=1, 
     #     microservices=microservices,
     #     trial_numbers=list(range(200)), trial_lengths=["10m"], 
     #     trial_users=["50"])
         
+    
+    # The following runs provided the idle baseline data for experiment 1
     # run_baseline_idle_sample("calibration-20251019-idle", 200, 10)
+    
+    # The following run provides data for expermient 2
+    # run_resource_utilization_sample(bucket_name_prefix="calibration-20251021", 
+    #     replicas=1, 
+    #     microservices=microservices,
+    #     trial_numbers=list(range(30)), trial_lengths=["10m"], 
+    #     trial_users=["25", "50", "75", "100"],
+    #     wait_for_cooling_before_run=True)
+    
+    # The following run provides data for expermient 2
+    run_resource_utilization_sample(bucket_name_prefix="experiment-3-20251023", 
+        replicas=1, 
+        microservices=microservices,
+        trial_numbers=list(range(200)), trial_lengths=["10m"], 
+        trial_users=["75"],
+        wait_for_cooling_before_run=True)
     
