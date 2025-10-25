@@ -91,15 +91,49 @@ def simple_kafka_reinit(namespace: str = "globeco",
                 pod = Pod.get(pod_name, namespace=namespace)
                 if pod.ready:
                     print("[SUCCESS] Pod is ready")
-                    print(f"[SUCCESS] Kafka is ready at: {statefulset_name}.{namespace}.svc.cluster.local:9092")
-                    return True
+                    break
             except:
                 pass
             time.sleep(2)
             count += 2
+        else:
+            print("[ERROR] Timeout waiting for pod to be ready")
+            return False
         
-        print("[ERROR] Timeout waiting for pod to be ready")
-        return False
+        # Step 5: Create Kafka topics
+        print("[INFO] Creating Kafka topics...")
+        topics = ["orders", "fills"]
+        partitions = 20
+        
+        for topic in topics:
+            print(f"[INFO] Creating topic '{topic}' with {partitions} partitions...")
+            create_topic_command = [
+                "kubectl", "exec", "-n", namespace, pod_name, "--",
+                "/opt/kafka/bin/kafka-topics.sh",
+                "--create",
+                "--topic", topic,
+                "--partitions", str(partitions),
+                "--replication-factor", "1",
+                "--bootstrap-server", "localhost:9092"
+            ]
+            
+            try:
+                result = subprocess.run(create_topic_command, capture_output=True, text=True, timeout=30)
+                if result.returncode == 0:
+                    print(f"[SUCCESS] Topic '{topic}' created successfully")
+                else:
+                    # Check if topic already exists (not an error)
+                    if "already exists" in result.stderr:
+                        print(f"[INFO] Topic '{topic}' already exists")
+                    else:
+                        print(f"[WARNING] Failed to create topic '{topic}': {result.stderr}")
+            except subprocess.TimeoutExpired:
+                print(f"[WARNING] Timeout creating topic '{topic}'")
+            except Exception as e:
+                print(f"[WARNING] Error creating topic '{topic}': {e}")
+        
+        print(f"[SUCCESS] Kafka is ready at: {statefulset_name}.{namespace}.svc.cluster.local:9092")
+        return True
         
     except Exception as e:
         print(f"[ERROR] Reinitialization failed: {e}")
