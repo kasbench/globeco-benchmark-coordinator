@@ -37,6 +37,35 @@ def simple_kafka_reinit(namespace: str = "globeco",
     print("[INFO] Starting simple Kafka reinitialization...")
     
     try:
+        # Step 0: Delete existing topics
+        print("[INFO] Deleting existing Kafka topics...")
+        topics_to_delete = ["orders", "fills"]
+        
+        for topic in topics_to_delete:
+            print(f"[INFO] Deleting topic '{topic}'...")
+            delete_topic_command = [
+                "kubectl", "exec", "-n", namespace, f"{statefulset_name}-0", "-c", "kafka", "--",
+                "/opt/kafka/bin/kafka-topics.sh",
+                "--delete",
+                "--topic", topic,
+                "--bootstrap-server", "localhost:9092"
+            ]
+            
+            try:
+                result = subprocess.run(delete_topic_command, capture_output=True, text=True, timeout=30)
+                if result.returncode == 0:
+                    print(f"[SUCCESS] Topic '{topic}' deleted successfully")
+                else:
+                    # Check if topic doesn't exist (not an error)
+                    if "does not exist" in result.stderr or "UnknownTopicOrPartitionException" in result.stderr:
+                        print(f"[INFO] Topic '{topic}' does not exist")
+                    else:
+                        print(f"[WARNING] Failed to delete topic '{topic}': {result.stderr}")
+            except subprocess.TimeoutExpired:
+                print(f"[WARNING] Timeout deleting topic '{topic}'")
+            except Exception as e:
+                print(f"[WARNING] Error deleting topic '{topic}': {e}")
+        
         # Step 1: Scale StatefulSet to 0
         print("[INFO] Scaling StatefulSet to 0...")
         statefulset = StatefulSet.get(statefulset_name, namespace=namespace)
@@ -79,16 +108,6 @@ def simple_kafka_reinit(namespace: str = "globeco",
             print("[SUCCESS] Data directory cleaned")
         else:
             print(f"[WARNING] Directory clean may have failed: {result.stderr}")
-
-        # Temporary workaround: delete the PVC
-        # Delete the PVC
-        pvc_name = f"kafka-data-{statefulset_name}-0"
-        print(f"[INFO] Deleting PVC {pvc_name}...")
-        pvc = PersistentVolumeClaim.get(pvc_name, namespace=namespace)
-        pvc.delete()
-
-        # Wait for PVC to be deleted
-        time.sleep(5)
 
         # Step 3: Scale StatefulSet back to 1
         print("[INFO] Scaling StatefulSet back to 1...")
