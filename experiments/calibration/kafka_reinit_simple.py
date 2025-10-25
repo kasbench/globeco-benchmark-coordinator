@@ -7,7 +7,8 @@ import re
 import time
 import subprocess
 import kr8s
-from kr8s.objects import StatefulSet, Pod
+from kr8s.objects import StatefulSet, Pod, PersistentVolumeClaim
+
 
 def delete_node_debugger_pods():
     for pod in kr8s.get("pods", namespace="globeco"):
@@ -79,6 +80,15 @@ def simple_kafka_reinit(namespace: str = "globeco",
         else:
             print(f"[WARNING] Directory clean may have failed: {result.stderr}")
 
+        # Temporary workaround: delete the PVC
+        # Delete the PVC
+        pvc_name = f"kafka-data-{statefulset_name}-0"
+        print(f"[INFO] Deleting PVC {pvc_name}...")
+        pvc = PersistentVolumeClaim.get(pvc_name, namespace=namespace)
+        pvc.delete()
+
+        # Wait for PVC to be deleted
+        time.sleep(5)
 
         # Step 3: Scale StatefulSet back to 1
         print("[INFO] Scaling StatefulSet back to 1...")
