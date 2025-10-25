@@ -108,7 +108,7 @@ def simple_kafka_reinit(namespace: str = "globeco",
         for topic in topics:
             print(f"[INFO] Creating topic '{topic}' with {partitions} partitions...")
             create_topic_command = [
-                "kubectl", "exec", "-n", namespace, pod_name, "--",
+                "kubectl", "exec", "-n", namespace, pod_name, "-c", "kafka", "--",
                 "/opt/kafka/bin/kafka-topics.sh",
                 "--create",
                 "--topic", topic,

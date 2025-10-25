@@ -678,7 +678,7 @@ def initialize_databases():
     time.sleep(22)
 
     # cleanup node debugger pods.  
-    # kafka_reinit_simple.delete_node_debugger_pods()
+    kafka_reinit_simple.delete_node_debugger_pods()
 
 
 def set_state(states, replicas):
@@ -931,6 +931,8 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
             ssh.set_cpu_governor_to_performance(revert=True)    
             print(f"End time: {end_time.strftime("%Y-%m-%d %H:%M:%S")}")
             filename = make_resource_trial_file_name(trial, log_extension)
+            exit
+            aadadfasdfasdf
             save_to_minio(minio_client, raw_output, log_bucket_name, filename)
             for metric, metric_bucket_name, metric_extension, calculate_rate in zip(metrics, metric_bucket_names, metric_extensions, calculate_rates):
                 prom = prometheus.get_prometheus_connection()
@@ -1015,6 +1017,8 @@ if __name__ == "__main__":
     
     microservices = selected_microservices + ['globeco-order-generation-service']
 
+    experiment = 2
+
     # The following was abandoned in favor of run_resource_utilization_sample with modifications
     # run_fixed_size(bucket_name="experiment-2-20251021-raw", replicas=1, selected_microservices=selected_microservices, 
     #     trial_numbers=list(range(30)), trial_lengths=["10m"], 
@@ -1022,29 +1026,32 @@ if __name__ == "__main__":
     #     trial_cpus=["1000m"] )
         
     # The following runs were used for experiment 1 calibration data collection.
-    # run_resource_utilization_sample(bucket_name_prefix="calibration-20251013", 
-    #     replicas=1, 
-    #     microservices=microservices,
-    #     trial_numbers=list(range(200)), trial_lengths=["10m"], 
-    #     trial_users=["50"])
-        
+    if experiment == 1:
+        run_resource_utilization_sample(bucket_name_prefix="calibration-20251013", 
+            replicas=1, 
+            microservices=microservices,
+            trial_numbers=list(range(200)), trial_lengths=["10m"], 
+            trial_users=["50"])
+
     
     # The following runs provided the idle baseline data for experiment 1
     # run_baseline_idle_sample("calibration-20251019-idle", 200, 10)
     
     # The following run provides data for expermient 2
-    # run_resource_utilization_sample(bucket_name_prefix="calibration-20251021", 
-    #     replicas=1, 
-    #     microservices=microservices,
-    #     trial_numbers=list(range(30)), trial_lengths=["10m"], 
-    #     trial_users=["25", "50", "75", "100"],
-    #     wait_for_cooling_before_run=True)
+    if experiment == 2: 
+        run_resource_utilization_sample(bucket_name_prefix="experiment-2-20251025", 
+            replicas=1, 
+            microservices=microservices,
+            trial_numbers=list(range(30)), trial_lengths=["10m"], 
+            trial_users=["25", "50", "75", "100"],
+            wait_for_cooling_before_run=True)
     
-    # The following run provides data for expermient 2
-    run_resource_utilization_sample(bucket_name_prefix="experiment-3-20251023", 
-        replicas=1, 
-        microservices=microservices,
-        trial_numbers=list(range(200)), trial_lengths=["10m"], 
-        trial_users=["75"],
-        wait_for_cooling_before_run=True)
-    
+    # The following run provides data for expermient 3
+    if experiment == 3:
+        run_resource_utilization_sample(bucket_name_prefix="experiment-3-20251023", 
+            replicas=1, 
+            microservices=microservices,
+            trial_numbers=list(range(200)), trial_lengths=["10m"], 
+            trial_users=["75"],
+            wait_for_cooling_before_run=True)
+        
