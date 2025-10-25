@@ -64,10 +64,11 @@ def simple_kafka_reinit(namespace: str = "globeco",
             "kubectl", "debug", f"node/{node_name}", 
             "-it", "--image=busybox",  "--",
             "sh", "-c", 
-            f"rm -rf /host{data_path}/* /host{data_path}/.[!.]* 2>/dev/null || true; "
+            f"rm -rf /host{data_path}; "
             f"mkdir -p /host{data_path}; "
             f"chown -R 1000:1000 /host{data_path}; "
-            f"echo 'Directory cleaned on {node_name}'"
+            f"ls -la /host{data_path}; "
+            f"echo 'Directory completely cleaned and recreated on {node_name}'"
         ]
         
         # Run the debug command
