@@ -86,6 +86,8 @@ def simple_kafka_reinit(namespace: str = "globeco",
             count += 1
         
         print("[SUCCESS] Pod terminated")
+
+        time.sleep(5)  # Extra wait to ensure resources are released
         
         # Step 2: Clean the data directory
         print(f"[INFO] Cleaning data directory {data_path} on {node_name}...")
@@ -129,8 +131,41 @@ def simple_kafka_reinit(namespace: str = "globeco",
         else:
             print("[ERROR] Timeout waiting for pod to be ready")
             return False
+
+        print("[INFO] Waiting additional 30 seconds for Kafka to initialize...")
+        time.sleep(30)
+
+        # Step 5: Delete existing topics -- For some reason they may reappear after reinit
+        print("[INFO] Deleting existing Kafka topics...")
+        topics_to_delete = ["orders", "fills"]
         
-        # Step 5: Create Kafka topics
+        for topic in topics_to_delete:
+            print(f"[INFO] Deleting topic '{topic}'...")
+            delete_topic_command = [
+                "kubectl", "exec", "-n", namespace, f"{statefulset_name}-0", "-c", "kafka", "--",
+                "/opt/kafka/bin/kafka-topics.sh",
+                "--delete",
+                "--topic", topic,
+                "--bootstrap-server", "localhost:9092"
+            ]
+            
+            try:
+                result = subprocess.run(delete_topic_command, capture_output=True, text=True, timeout=30)
+                if result.returncode == 0:
+                    print(f"[SUCCESS] Topic '{topic}' deleted successfully")
+                else:
+                    # Check if topic doesn't exist (not an error)
+                    if "does not exist" in result.stderr or "UnknownTopicOrPartitionException" in result.stderr:
+                        print(f"[INFO] Topic '{topic}' does not exist")
+                    else:
+                        print(f"[WARNING] Failed to delete topic '{topic}': {result.stderr}")
+            except subprocess.TimeoutExpired:
+                print(f"[WARNING] Timeout deleting topic '{topic}'")
+            except Exception as e:
+                print(f"[WARNING] Error deleting topic '{topic}': {e}")
+
+
+        # Step 6: Create Kafka topics
         print("[INFO] Creating Kafka topics...")
         topics = ["orders", "fills"]
         partitions = 20
@@ -167,7 +202,7 @@ def simple_kafka_reinit(namespace: str = "globeco",
         
     except Exception as e:
         print(f"[ERROR] Reinitialization failed: {e}")
-        return False
+        raise e
 
 
 if __name__ == "__main__":

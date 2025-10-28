@@ -796,7 +796,9 @@ def run(bucket_name, replicas, selected_microservices, trial_numbers, trial_leng
     while trial := get_next_trial(minio_client, trials, bucket_name):
         try:
             scale_microservice_deployments(0)
+            time.sleep(30) # Allow time for scale down
             initialize_databases()
+            time.sleep(20) # Give databases time to stabilize
             initialize_environments_for_trial(trial, replicas=replicas)
             print("Environment Initialized.  Starting 30 second wait.")
             time.sleep(30) # It will take at least this long.  Waiting leaves time for stabilization.
@@ -848,7 +850,6 @@ def run_fixed_size(bucket_name, replicas, selected_microservices, trial_numbers,
         try:
             scale_microservice_deployments(0)
             initialize_databases()
-            adfasdfsdaffd
             initialize_environments_for_resource_trial(trial, replicas=replicas)
             print("Environment Initialized.  Starting 30 second wait.")
             time.sleep(30) # It will take at least this long.  Waiting leaves time for stabilization.
@@ -931,8 +932,6 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
             ssh.set_cpu_governor_to_performance(revert=True)    
             print(f"End time: {end_time.strftime("%Y-%m-%d %H:%M:%S")}")
             filename = make_resource_trial_file_name(trial, log_extension)
-            exit
-            aadadfasdfasdf
             save_to_minio(minio_client, raw_output, log_bucket_name, filename)
             for metric, metric_bucket_name, metric_extension, calculate_rate in zip(metrics, metric_bucket_names, metric_extensions, calculate_rates):
                 prom = prometheus.get_prometheus_connection()
@@ -1017,7 +1016,7 @@ if __name__ == "__main__":
     
     microservices = selected_microservices + ['globeco-order-generation-service']
 
-    experiment = 2
+    experiment = 3 # Change this value to select the experiment to run
 
     # The following was abandoned in favor of run_resource_utilization_sample with modifications
     # run_fixed_size(bucket_name="experiment-2-20251021-raw", replicas=1, selected_microservices=selected_microservices, 
@@ -1048,7 +1047,7 @@ if __name__ == "__main__":
     
     # The following run provides data for expermient 3
     if experiment == 3:
-        run_resource_utilization_sample(bucket_name_prefix="experiment-3-20251023", 
+        run_resource_utilization_sample(bucket_name_prefix="experiment-3-20251026", 
             replicas=1, 
             microservices=microservices,
             trial_numbers=list(range(200)), trial_lengths=["10m"], 
