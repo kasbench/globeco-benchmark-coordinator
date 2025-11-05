@@ -698,8 +698,8 @@ def initialize_environments_for_trial(trial,  replicas=1):
     states = get_microservice_states([{microservice: {"cpu_request": trial_cpu, "cpu_limit": trial_cpu}}])
     set_state(states, replicas)
 
-def initialize_environments_for_resource_trial(trial,  replicas=1):
-    states = get_microservice_states([])
+def initialize_environments_for_resource_trial(trial,  replicas=1, overrides=[]):
+    states = get_microservice_states(overrides)
     set_state(states, replicas)
 
 
@@ -711,29 +711,37 @@ def cpu_equal(cpu1, cpu2):
     if cpu1 == "1" and cpu2 == "1000m":
         return True
     return False 
+
+def make_override_dict(overrides):
+    override_dict = {}
+    for override in overrides:
+        for microservice, override_detail in override.items():
+            override_dict[microservice] = override_detail
+    return override_dict
     
-def validate_environments(trial):
-    microservice, trial_num, trial_length, trial_users, trial_cpu = trial
+def validate_environments(trial, overrides=[]):
+
+    overrides_dict = make_override_dict(overrides)
     for deployment in get_microservice_deployments():
-        if deployment.name == 'globeco-order-generation-service':
-            continue
         spec = deployment.spec
+        microservice = deployment.name
         for container in spec['template']['spec']['containers']:
-            if container['name'] == container.name:
-                # print(f"Validating {container.name}")
+            if container.name == microservice:
+                print(f"Validating {container.name}")
                 resources = container['resources']
-                # print(f"Resources: {resources}")
+                print(f"Resources: {resources}")
                 requests = resources['requests']
                 limits = resources['limits']
-                # assert cpu_equal(requests['cpu'], trial_cpu), "Requests CPU does not match" 
-                # assert cpu_equal(limits['cpu'], trial_cpu), "Limits CPU does not match"
-                if container['name'] == microservice:
-                    assert cpu_equal(requests['cpu'], trial_cpu), "Requests CPU does not match" 
-                    assert cpu_equal(limits['cpu'], trial_cpu), "Limits CPU does not match"
-                else:
-                    assert requests['cpu'] == '1'   
-                    assert limits['cpu'] == '1'
-        
+
+                assert requests['cpu'] == overrides_dict[microservice]["cpu_request"], \
+                    f"CPU request does not match for {container['name']}. Expected {overrides_dict[microservice]['cpu_request']}, got {requests['cpu']}"
+                assert limits['cpu'] == overrides_dict[microservice]["cpu_limit"], \
+                    f"CPU limit does not match for {container['name']}. Expected {overrides_dict[microservice]['cpu_limit']}, got {limits['cpu']}"
+                assert requests['memory'] == overrides_dict[microservice]["memory_request"], \
+                    f"Memory request does not match for {container['name']}. Expected {overrides_dict[microservice]['memory_request']}, got {requests['memory']}"
+                assert limits['memory'] == overrides_dict[microservice]["memory_limit"], \
+                    f"Memory limit does not match for {container['name']}. Expected {overrides_dict[microservice]['memory_limit']}, got {limits['memory']}"
+
 
 def ensure_bucket_exists(client: Minio, bucket_name: str):
     """
@@ -870,7 +878,8 @@ def run_fixed_size(bucket_name, replicas, selected_microservices, trial_numbers,
 
 
 def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices, trial_numbers, trial_lengths, 
-                                    trial_users, wait_for_cooling_before_run=False ):
+                                    trial_users, wait_for_cooling_before_run=False, validate=False,
+                                     overrides=[]):
     
     minio_client = Minio(
         "minio:9000",  
@@ -912,14 +921,27 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
             metric_bucket_names,
             metric_extensions):
         try:
+            print(f"Starting trial: {trial}")
+            print("Setting CPU governor to performance mode")
             ssh.set_cpu_governor_to_performance(revert=True)
+            print("Scaling down microservices")
             scale_microservice_deployments(0)
+            print("Initializing databases")
             initialize_databases()
-            initialize_environments_for_resource_trial(trial, replicas=replicas)
-            print("Environment Initialized.  Starting 60 second wait.")
-            time.sleep(60) # It will take at least this long.  Waiting leaves time for stabilization.
+            print("Initializing environments for resource trial")
+            initialize_environments_for_resource_trial(trial, replicas=replicas, overrides=overrides)
+            print("Environment Initialized.")
+            if validate:
+                print("Waiting for 15 seconds before validation...")
+                time.sleep(15) # Short wait before validation
+                validate_environments(trial, overrides=overrides)
+                print("Environment validation complete.  Starting 45 second wait.")
+                time.sleep(45) # It will take at least this long.  Waiting leaves time for stabilization.
+            else:
+                print("Starting 60 second wait.")
+                time.sleep(60) # It will take at least this long.  Waiting leaves time for stabilization.
+            
             wait_for_all_rollouts()
-            # validate_environments(trial)
             time.sleep(10) # Stabilization
             print("Wait up to 5 minutes for cooling")
             if wait_for_cooling_before_run: 
@@ -1016,7 +1038,7 @@ if __name__ == "__main__":
     
     microservices = selected_microservices + ['globeco-order-generation-service']
 
-    experiment = 3 # Change this value to select the experiment to run
+    experiment = 4 # Change this value to select the experiment to run
 
     # The following was abandoned in favor of run_resource_utilization_sample with modifications
     # run_fixed_size(bucket_name="experiment-2-20251021-raw", replicas=1, selected_microservices=selected_microservices, 
@@ -1053,4 +1075,196 @@ if __name__ == "__main__":
             trial_numbers=list(range(200)), trial_lengths=["10m"], 
             trial_users=["75"],
             wait_for_cooling_before_run=True)
-        
+
+    # The following run provides data for expermient 4
+
+    # Original overrides for experiment 4
+    # This is experiment B in the report.  It was modified from the original non-woring experiment A
+    overrides_b = [
+        {'globeco-allocation-service': {'cpu_request': '100m', 'cpu_limit': '100m', 
+                                        'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-confirmation-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                          'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-execution-service': {'cpu_request': '300m', 'cpu_limit': '300m',
+                                       'memory_request': '900Mi', 'memory_limit': '900Mi'}},
+        {'globeco-fix-engine': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-order-generation-service': {'cpu_request': '500m', 'cpu_limit': '500m',
+                                   'memory_request': '700Mi', 'memory_limit': '700Mi'}},
+        {'globeco-order-service': {'cpu_request': '400m', 'cpu_limit': '400m',
+                                   'memory_request': '1100Mi', 'memory_limit': '1100Mi'}},
+        {'globeco-portfolio-accounting-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                                  'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-portfolio-management-portal': {'cpu_request': '200m', 'cpu_limit': '200m',
+                                                  'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-portfolio-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                       'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-pricing-service': {'cpu_request': '300m', 'cpu_limit': '300m',
+                                     'memory_request': '1000Mi', 'memory_limit': '1000Mi'}},
+        {'globeco-security-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                       'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-trade-service': {'cpu_request': '400m', 'cpu_limit': '400m',
+                                   'memory_request': '1000Mi', 'memory_limit': '1000Mi'}}
+    ]
+
+    # This is a non-named experiment.
+    # Modified overrides for experiment 4 with increased resources for the order generation service
+    overrides = [
+        {'globeco-allocation-service': {'cpu_request': '100m', 'cpu_limit': '100m', 
+                                        'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-confirmation-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                          'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-execution-service': {'cpu_request': '300m', 'cpu_limit': '300m',
+                                       'memory_request': '900Mi', 'memory_limit': '900Mi'}},
+        {'globeco-fix-engine': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-order-generation-service': {'cpu_request': '1', 'cpu_limit': '1',
+                                   'memory_request': '700Mi', 'memory_limit': '700Mi'}},
+        {'globeco-order-service': {'cpu_request': '400m', 'cpu_limit': '400m',
+                                   'memory_request': '1100Mi', 'memory_limit': '1100Mi'}},
+        {'globeco-portfolio-accounting-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                                  'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-portfolio-management-portal': {'cpu_request': '200m', 'cpu_limit': '200m',
+                                                  'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-portfolio-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                       'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-pricing-service': {'cpu_request': '300m', 'cpu_limit': '300m',
+                                     'memory_request': '1000Mi', 'memory_limit': '1000Mi'}},
+        {'globeco-security-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                       'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-trade-service': {'cpu_request': '400m', 'cpu_limit': '400m',
+                                   'memory_request': '1000Mi', 'memory_limit': '1000Mi'}}
+    ]
+
+
+    # This is a non-named experiment.
+    # A Modified overrides for experiment 4 with increased resources for the pricing service (also includes pricing service)
+    overrides = [
+        {'globeco-allocation-service': {'cpu_request': '100m', 'cpu_limit': '100m', 
+                                        'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-confirmation-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                          'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-execution-service': {'cpu_request': '300m', 'cpu_limit': '300m',
+                                       'memory_request': '900Mi', 'memory_limit': '900Mi'}},
+        {'globeco-fix-engine': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-order-generation-service': {'cpu_request': '1', 'cpu_limit': '1',
+                                   'memory_request': '700Mi', 'memory_limit': '700Mi'}},
+        {'globeco-order-service': {'cpu_request': '400m', 'cpu_limit': '400m',
+                                   'memory_request': '1100Mi', 'memory_limit': '1100Mi'}},
+        {'globeco-portfolio-accounting-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                                  'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-portfolio-management-portal': {'cpu_request': '200m', 'cpu_limit': '200m',
+                                                  'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-portfolio-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                       'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-pricing-service': {'cpu_request': '600m', 'cpu_limit': '600m',
+                                     'memory_request': '1000Mi', 'memory_limit': '1000Mi'}},
+        {'globeco-security-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                       'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-trade-service': {'cpu_request': '400m', 'cpu_limit': '400m',
+                                   'memory_request': '1000Mi', 'memory_limit': '1000Mi'}}
+    ]
+
+ 
+    # This is a non-named experiment
+    # Modified overrides for experiment 4 with increased resources for the security, execution, and order service
+    overrides = [
+        {'globeco-allocation-service': {'cpu_request': '100m', 'cpu_limit': '100m', 
+                                        'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-confirmation-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                          'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-execution-service': {'cpu_request': '600m', 'cpu_limit': '600m',
+                                       'memory_request': '900Mi', 'memory_limit': '900Mi'}},
+        {'globeco-fix-engine': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-order-generation-service': {'cpu_request': '1', 'cpu_limit': '1',
+                                   'memory_request': '700Mi', 'memory_limit': '700Mi'}},
+        {'globeco-order-service': {'cpu_request': '800m', 'cpu_limit': '800m',
+                                   'memory_request': '1100Mi', 'memory_limit': '1100Mi'}},
+        {'globeco-portfolio-accounting-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                                  'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-portfolio-management-portal': {'cpu_request': '200m', 'cpu_limit': '200m',
+                                                  'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-portfolio-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                       'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-pricing-service': {'cpu_request': '600m', 'cpu_limit': '600m',
+                                     'memory_request': '1000Mi', 'memory_limit': '1000Mi'}},
+        {'globeco-security-service': {'cpu_request': '300m', 'cpu_limit': '300m',
+                                       'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-trade-service': {'cpu_request': '400m', 'cpu_limit': '400m',
+                                   'memory_request': '1000Mi', 'memory_limit': '1000Mi'}}
+    ]
+
+    # C Recalculated overrides based on 99th percentile of raw CPU usage from experiment 3
+    overrides = [
+        {'globeco-allocation-service': {'cpu_request': '100m', 'cpu_limit': '100m', 
+                                        'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-confirmation-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                          'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-execution-service': {'cpu_request': '500m', 'cpu_limit': '500m',
+                                       'memory_request': '900Mi', 'memory_limit': '900Mi'}},
+        {'globeco-fix-engine': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-order-generation-service': {'cpu_request': '1', 'cpu_limit': '1',
+                                   'memory_request': '700Mi', 'memory_limit': '700Mi'}},
+        {'globeco-order-service': {'cpu_request': '1', 'cpu_limit': '1',
+                                   'memory_request': '1100Mi', 'memory_limit': '1100Mi'}},
+        {'globeco-portfolio-accounting-service': {'cpu_request': '100m', 'cpu_limit': '100m',
+                                                  'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-portfolio-management-portal': {'cpu_request': '500m', 'cpu_limit': '500m',
+                                                  'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-portfolio-service': {'cpu_request': '200m', 'cpu_limit': '200m',
+                                       'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-pricing-service': {'cpu_request': '1', 'cpu_limit': '1',
+                                     'memory_request': '1000Mi', 'memory_limit': '1000Mi'}},
+        {'globeco-security-service': {'cpu_request': '200m', 'cpu_limit': '200m',
+                                       'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-trade-service': {'cpu_request': '900m', 'cpu_limit': '900m',
+                                   'memory_request': '1000Mi', 'memory_limit': '1000Mi'}}
+    ]
+
+
+# D Recalculated overrides based on 99.99th percentile of raw CPU usage from experiment 3 plus 100m buffer
+    overrides = [
+        {'globeco-allocation-service': {'cpu_request': '200m', 'cpu_limit': '200m', 
+                                        'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-confirmation-service': {'cpu_request': '200m', 'cpu_limit': '200m',
+                                          'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-execution-service': {'cpu_request': '600m', 'cpu_limit': '600m',
+                                       'memory_request': '900Mi', 'memory_limit': '900Mi'}},
+        {'globeco-fix-engine': {'cpu_request': '200m', 'cpu_limit': '200m',
+                                'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-order-generation-service': {'cpu_request': '1', 'cpu_limit': '1',
+                                   'memory_request': '700Mi', 'memory_limit': '700Mi'}},
+        {'globeco-order-service': {'cpu_request': '1', 'cpu_limit': '1',
+                                   'memory_request': '1100Mi', 'memory_limit': '1100Mi'}},
+        {'globeco-portfolio-accounting-service': {'cpu_request': '200m', 'cpu_limit': '200m',
+                                                  'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+        {'globeco-portfolio-management-portal': {'cpu_request': '600m', 'cpu_limit': '600m',
+                                                  'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-portfolio-service': {'cpu_request': '300m', 'cpu_limit': '300m',
+                                       'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-pricing-service': {'cpu_request': '1', 'cpu_limit': '1',
+                                     'memory_request': '1000Mi', 'memory_limit': '1000Mi'}},
+        {'globeco-security-service': {'cpu_request': '300m', 'cpu_limit': '300m',
+                                       'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+        {'globeco-trade-service': {'cpu_request': '1', 'cpu_limit': '1',
+                                   'memory_request': '1000Mi', 'memory_limit': '1000Mi'}}
+    ]
+
+
+
+    # experiment-4-20251029a with increased resources for order generation and pricing service
+    # experiment-4-20251029b with increased resources for execution, order, and security services
+
+    if experiment == 4:
+        run_resource_utilization_sample(bucket_name_prefix="experiment-4-20251029b", 
+            replicas=1, 
+            microservices=microservices,
+            trial_numbers=list(range(100)), trial_lengths=["10m"], 
+            trial_users=["75"],
+            wait_for_cooling_before_run=True,
+            validate=True,
+            overrides=overrides_b)
+         
