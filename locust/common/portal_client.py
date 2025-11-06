@@ -5,7 +5,7 @@ import random
 import time
 from typing import List
 
-from requests.exceptions import ConnectionErroradd
+from requests.exceptions import ConnectionError
 import requests.packages.urllib3.util.connection
 import common.portal_client as portal_client
 
