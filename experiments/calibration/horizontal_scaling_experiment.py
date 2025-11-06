@@ -1,7 +1,7 @@
 from typing import Any
 
 from experiments.calibration import common
-
+from experiments.calibration.common import get_threshold_lookup
 
 
 def get_kubernetes_resources(version_name: str) -> list[dict[str, dict[str, str]] | Any] | None:
@@ -62,9 +62,30 @@ def run(replicas:list[int]=None, kubernetes_resources:str= "baseline", times:lis
     if minio_prefix is None:
         raise ValueError("minio_prefix cannot be None")
 
-
     minio_client = common.minio_client()
     kubernetes_resources = get_kubernetes_resources(kubernetes_resources)
+
+
+    thermal_threshold_lookup = get_threshold_lookup()
+
+    metrics = ["container_cpu_usage_seconds_total", "container_cpu_cfs_throttled_seconds_total",
+                "container_memory_working_set_bytes"]
+    calculate_rates = [True,  True, False]
+    extensions = ["-logs.json", "-cpu-usage.parquet", "-cpu-usage-raw.parquet", "-cpu-throttled.parquet", "-memory-wsb.parquet"]
+    log_extension = extensions[0]
+    metric_extensions = extensions[1:]
+    bucket_extensions = ["-logs-raw", "-cpu-usage", "-cpu-usage-raw", "-cpu-throttled", "-memory-wsb"]
+    bucket_names = [f"{bucket_name_prefix}{bucket_extension}" for bucket_extension in bucket_extensions]
+    node_bucket_name = f"{bucket_name_prefix}-node"
+    log_bucket_name = bucket_names[0]
+    metric_bucket_names = bucket_names[1:]
+
+    for bucket_name in bucket_names:
+        ensure_bucket_exists(minio_client, bucket_name)
+    ensure_bucket_exists(minio_client, node_bucket_name)
+
+
+
 
     trials = get_trials(replicas, times, users, iterations)
 
