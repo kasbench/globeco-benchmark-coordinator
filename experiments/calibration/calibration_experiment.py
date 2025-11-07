@@ -12,7 +12,7 @@ import prometheus
 from experiments.calibration.common import scale_microservice_deployments, wait_for_all_rollouts, parse_locust_output, \
     get_threshold_lookup, wait_for_cooling, file_count, file_exists, initialize_databases, \
     initialize_environments_for_trial, initialize_environments_for_resource_trial, validate_environments, \
-    ensure_bucket_exists, save_to_minio
+    ensure_bucket_exists, save_to_minio, run_test_in_kubernetes
 from experiments.calibration.constants import namespace, NODE_METRICS, eastern_tz
 
 
@@ -73,49 +73,6 @@ def run_test(tag, time_expression="5m", user_count="1", spawn_rate="1", verbose=
     except Exception as e:
         print(f"Error: {e}")
         subprocess.run(["kubectl", "delete", "pod", pod_name])
-
-def run_test_in_kubernetes(time_expression="5m", user_count="1", spawn_rate="1", verbose=False):
-    pod_name = f"locust-bench-{int(time.time())}"
-
-    command_line = [
-        "uv", "run", "locust", "-f", "./scripts/end_to_end_sequential.py",
-        "--host=http://globeco-portfolio-management-portal:3000",
-        "--headless", "-t", time_expression, "-u", user_count,
-        "--spawn-rate", spawn_rate, "--json", "--skip-log", "--only-summary", "--reset-stats",
-        "--loglevel", "ERROR", "EndToEndUser"
-    ]
-
-    try:
-        # Create pod
-        subprocess.run([
-            "kubectl", "run", pod_name, "--restart=Never",
-            "-n", namespace,
-            "--image=kasbench/globeco-benchmark-coordinator",
-            "--command", "--"
-        ] + command_line, check=True)
-
-        # Wait for completion and get logs
-        if verbose:
-            print("Waiting for pod to complete...")
-        time.sleep(55)  # Give pod plenty of time to start.  It's ok that this is unnecessarily long, since
-                        # we will be waiting for the pod to finish in the next step, and all runs are at 
-                        # least 1 minute.
-
-        # Follow logs until pod completes
-        logs_result = subprocess.run([
-            "kubectl", "logs", "-f", pod_name, "-n", namespace, 
-        ], capture_output=True, text=True, timeout=600)
-
-        # Clean up
-        subprocess.run(["kubectl", "delete", "pod", pod_name, "-n", namespace])
-
-        # Return results
-
-        return logs_result.stdout
-        
-    except Exception as e:
-        subprocess.run(["kubectl", "delete", "pod", pod_name])
-        raise e
 
 
 def get_trials(selected_microservices, trial_numbers=[0, 1, 2, 3, 4, 5, 6, 7], trial_lengths=["2m"],
@@ -228,7 +185,7 @@ def run(bucket_name, replicas, selected_microservices, trial_numbers, trial_leng
             print("Environment Initialized.  Starting 30 second wait.")
             time.sleep(30) # It will take at least this long.  Waiting leaves time for stabilization.
             wait_for_all_rollouts()
-            validate_environments(trial)
+            validate_environments()
             time.sleep(10) # Stabilization
             raw_output = run_trial(trial)
             filename = make_file_name(trial)
@@ -275,7 +232,7 @@ def run_fixed_size(bucket_name, replicas, selected_microservices, trial_numbers,
         try:
             scale_microservice_deployments(0)
             initialize_databases()
-            initialize_environments_for_resource_trial(trial, replicas=replicas)
+            initialize_environments_for_resource_trial(replicas=replicas)
             print("Environment Initialized.  Starting 30 second wait.")
             time.sleep(30) # It will take at least this long.  Waiting leaves time for stabilization.
             wait_for_all_rollouts()
@@ -346,12 +303,12 @@ def run_resource_utilization_sample(bucket_name_prefix, replicas, microservices,
             print("Initializing databases")
             initialize_databases()
             print("Initializing environments for resource trial")
-            initialize_environments_for_resource_trial(trial, replicas=replicas, overrides=overrides)
+            initialize_environments_for_resource_trial(replicas=replicas, overrides=overrides)
             print("Environment Initialized.")
             if validate:
                 print("Waiting for 15 seconds before validation...")
                 time.sleep(15) # Short wait before validation
-                validate_environments(trial, overrides=overrides)
+                validate_environments(overrides=overrides)
                 print("Environment validation complete.  Starting 45 second wait.")
                 time.sleep(45) # It will take at least this long.  Waiting leaves time for stabilization.
             else:

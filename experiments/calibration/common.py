@@ -11,9 +11,7 @@ import kr8s
 from kr8s.objects import StatefulSet
 from minio import S3Error, Minio
 
-from experiments.calibration import thermal_metrics_collector, kafka_reinit_simple
-from experiments.calibration.calibration_experiment import microservices
-from experiments.calibration.constants import namespace
+from constants import namespace, microservices
 
 
 minio_client = Minio(
@@ -475,11 +473,11 @@ def initialize_databases():
 def set_state(states, replicas):
     deployments = get_microservice_deployments()
     for deployment in deployments:
-        deployment.scale(replicas)
         patch_allocation(deployment, states[deployment.name]["cpu_request"],
                          states[deployment.name]["cpu_limit"],
                          states[deployment.name]["memory_request"],
                          states[deployment.name]["memory_limit"])
+        deployment.scale(replicas)
 
 
 def initialize_environments_for_trial(trial,  replicas=1):
@@ -490,7 +488,7 @@ def initialize_environments_for_trial(trial,  replicas=1):
     set_state(states, replicas)
 
 
-def initialize_environments_for_resource_trial(trial,  replicas=1, overrides=[]):
+def initialize_environments_for_resource_trial(replicas=1, overrides=[]):
     states = get_microservice_states(overrides)
     set_state(states, replicas)
 
@@ -513,7 +511,7 @@ def make_override_dict(overrides):
     return override_dict
 
 
-def validate_environments(trial, overrides=[]):
+def validate_environments(overrides=[]):
 
     overrides_dict = make_override_dict(overrides)
     for deployment in get_microservice_deployments():
@@ -565,3 +563,47 @@ def save_to_minio(minio_client, output, bucket_name, filename):
     with tempfile.NamedTemporaryFile(mode='w+', delete=True) as tmp:
         tmp.write(output)
         minio_client.fput_object(bucket_name, filename, tmp.name)
+
+
+def run_test_in_kubernetes(time_expression="5m", user_count="1", spawn_rate="1", verbose=False):
+    pod_name = f"locust-bench-{int(time.time())}"
+
+    command_line = [
+        "uv", "run", "locust", "-f", "./scripts/end_to_end_sequential.py",
+        "--host=http://globeco-portfolio-management-portal:3000",
+        "--headless", "-t", time_expression, "-u", user_count,
+        "--spawn-rate", spawn_rate, "--json", "--skip-log", "--only-summary", "--reset-stats",
+        "--loglevel", "ERROR", "EndToEndUser"
+    ]
+
+    try:
+        # Create pod
+        subprocess.run([
+            "kubectl", "run", pod_name, "--restart=Never",
+            "-n", namespace,
+            "--image=kasbench/globeco-benchmark-coordinator",
+            "--command", "--"
+        ] + command_line, check=True)
+
+        # Wait for completion and get logs
+        if verbose:
+            print("Waiting for pod to complete...")
+        time.sleep(55)  # Give pod plenty of time to start.  It's ok that this is unnecessarily long, since
+                        # we will be waiting for the pod to finish in the next step, and all runs are at
+                        # least 1 minute.
+
+        # Follow logs until pod completes
+        logs_result = subprocess.run([
+            "kubectl", "logs", "-f", pod_name, "-n", namespace,
+        ], capture_output=True, text=True, timeout=600)
+
+        # Clean up
+        subprocess.run(["kubectl", "delete", "pod", pod_name, "-n", namespace])
+
+        # Return results
+
+        return logs_result.stdout
+
+    except Exception as e:
+        subprocess.run(["kubectl", "delete", "pod", pod_name])
+        raise e

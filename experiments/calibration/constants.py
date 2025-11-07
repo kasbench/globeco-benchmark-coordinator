@@ -1,3 +1,5 @@
+from zoneinfo import ZoneInfo
+
 eastern_tz = ZoneInfo("America/New_York")
 
 

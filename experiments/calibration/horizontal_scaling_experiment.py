@@ -5,11 +5,13 @@ import random
 import time
 from typing import Any
 
-from experiments.calibration import common, ssh, prometheus
-from experiments.calibration.common import get_threshold_lookup, ensure_bucket_exists, file_count, file_exists, \
+import common
+import ssh
+import prometheus
+from common import get_threshold_lookup, ensure_bucket_exists, file_count, file_exists, \
     scale_microservice_deployments, initialize_databases, initialize_environments_for_resource_trial, \
-    validate_environments, wait_for_all_rollouts, wait_for_cooling, save_to_minio
-from experiments.calibration.constants import NODE_METRICS, microservices
+    validate_environments, wait_for_all_rollouts, wait_for_cooling, save_to_minio, run_test_in_kubernetes
+from constants import NODE_METRICS, microservices
 
 
 def get_kubernetes_resources(version_name: str) -> list[dict[str, dict[str, str]] | Any] | None:
@@ -90,60 +92,23 @@ def get_next_trial(minio_client,
                 return trial
 
 
-def run_test_in_kubernetes(time_expression="5m", user_count="1", spawn_rate="1", replicas=1, verbose=False):
-    pod_name = f"locust-bench-{int(time.time())}"
-
-    command_line = [
-        "uv", "run", "locust", "-f", "./scripts/end_to_end_sequential.py",
-        "--host=http://globeco-portfolio-management-portal:3000",
-        "--headless", "-t", time_expression, "-u", user_count,
-        "--spawn-rate", spawn_rate, "--json", "--skip-log", "--only-summary", "--reset-stats",
-        "--loglevel", "ERROR", "EndToEndUser"
-    ]
-
-    try:
-        # Create pod
-        subprocess.run([
-                           "kubectl", "run", pod_name, "--restart=Never",
-                           "-n", namespace,
-                           "--image=kasbench/globeco-benchmark-coordinator",
-                           "--command", "--"
-                       ] + command_line, check=True)
-
-        # Wait for completion and get logs
-        if verbose:
-            print("Waiting for pod to complete...")
-        time.sleep(55)  # Give pod plenty of time to start.  It's ok that this is unnecessarily long, since
-        # we will be waiting for the pod to finish in the next step, and all runs are at
-        # least 1 minute.
-
-        # Follow logs until pod completes
-        logs_result = subprocess.run([
-            "kubectl", "logs", "-f", pod_name, "-n", namespace,
-        ], capture_output=True, text=True, timeout=600)
-
-        # Clean up
-        subprocess.run(["kubectl", "delete", "pod", pod_name, "-n", namespace])
-
-        # Return results
-
-        return logs_result.stdout
-
-    except Exception as e:
-        subprocess.run(["kubectl", "delete", "pod", pod_name])
-        raise e
 
 
 def run_resource_trial(trial, verbose=False):
 
     print(f"Running trial number {trial["iteration"]} for {trial["time"]} with {trial["replica"]} replicas and {trial["user"]} users.")
-    raw_output = run_test_in_kubernetes(time_expression=trial_length, user_count=trial_users, spawn_rate=trial_users,
+    raw_output = run_test_in_kubernetes(time_expression=trial["time"], user_count=trial["user"], spawn_rate=trial["user"],
                                         verbose=verbose)
     return raw_output
-    pass
 
 
-def run(replicas:list[int]=None, kubernetes_resources:str= "baseline", times:list[str]=None, users:list[int]=None,
+def initialize_only(kubernetes_resource_profile:str= "baseline", replicas=1, validate=True):
+    kubernetes_resources = get_kubernetes_resources(kubernetes_resource_profile)
+    initialize(kubernetes_resources, replicas, validate=validate)
+
+
+
+def run(replicas:list[int]=None, kubernetes_resource_profile:str= "baseline", times:list[str]=None, users:list[int]=None,
         iterations:int=30, bucket_name_prefix=None, validate=True, wait_for_cooling_before_run=True) -> int:
 
     # Process arguments
@@ -154,10 +119,10 @@ def run(replicas:list[int]=None, kubernetes_resources:str= "baseline", times:lis
     if times is None:
         times = ["10m"]
     if bucket_name_prefix is None:
-        raise ValueError("minio_prefix cannot be None")
+        raise ValueError("bucket_name_prefix cannot be None")
 
     minio_client = common.minio_client()
-    kubernetes_resources = get_kubernetes_resources(kubernetes_resources)
+    kubernetes_resources = get_kubernetes_resources(kubernetes_resource_profile)
 
     thermal_threshold_lookup = get_threshold_lookup()
 
@@ -183,37 +148,29 @@ def run(replicas:list[int]=None, kubernetes_resources:str= "baseline", times:lis
 
         try:
             print(f"Starting trial: {trial}")
+            
             print("Setting CPU governor to performance mode")
             ssh.set_cpu_governor_to_performance(revert=True)
-            print("Scaling down microservices")
-            scale_microservice_deployments(0)
-            print("Initializing databases")
-            initialize_databases()
-            print("Initializing environments for resource trial")
-            initialize_environments_for_resource_trial(trial, replicas=trial["replicas"], overrides=kubernetes_resources)
-            print("Environment Initialized.")
-            if validate:
-                print("Waiting for 15 seconds before validation...")
-                time.sleep(15)  # Short wait before validation
-                validate_environments(trial, overrides=kubernetes_resources)
-                print("Environment validation complete.  Starting 45 second wait.")
-                time.sleep(45)  # It will take at least this long.  Waiting leaves time for stabilization.
-            else:
-                print("Starting 60 second wait.")
-                time.sleep(60)  # It will take at least this long.  Waiting leaves time for stabilization.
 
-            wait_for_all_rollouts()
+            initialize(kubernetes_resources, trial["replica"], validate)
             time.sleep(10)  # Stabilization
+            
             print("Wait up to 5 minutes for cooling")
             if wait_for_cooling_before_run:
                 wait_for_cooling(thermal_threshold_lookup)
+            
             ssh.set_cpu_governor_to_performance()
+            
             start_time = datetime.now()
             print(f"Start time: {start_time.strftime("%Y-%m-%d %H:%M:%S")}")
+            
             raw_output = run_resource_trial(trial)
+            
             end_time = datetime.now()
-            ssh.set_cpu_governor_to_performance(revert=True)
             print(f"End time: {end_time.strftime("%Y-%m-%d %H:%M:%S")}")
+            
+            ssh.set_cpu_governor_to_performance(revert=True)
+            
             filename = make_trial_file_name(trial, log_extension)
             save_to_minio(minio_client, raw_output, log_bucket_name, filename)
             for metric, metric_bucket_name, metric_extension, calculate_rate in zip(metrics, metric_bucket_names,
@@ -242,18 +199,62 @@ def run(replicas:list[int]=None, kubernetes_resources:str= "baseline", times:lis
             continue
 
     ssh.set_cpu_governor_to_performance(revert=True)
-
-
-
-
-
-
-
+    print("Scaling down microservices")
+    scale_microservice_deployments(1)
 
     return 0
 
 
+def initialize(kubernetes_resources: list[dict[str, dict[str, str]] | Any] | None, replicas: int, validate: bool):
+    print("Scaling down microservices")
+    scale_microservice_deployments(0)
+    print("Initializing databases")
+    initialize_databases()
+    print("Initializing environments for resource trial")
+    initialize_environments_for_resource_trial(replicas=replicas, overrides=kubernetes_resources)
+    print("Environment Initialized.")
+    if validate:
+        print("Waiting for 15 seconds before validation...")
+        time.sleep(15)  # Short wait before validation
+        validate_environments(overrides=kubernetes_resources)
+        print("Environment validation complete.  Starting 45 second wait.")
+        time.sleep(45)  # It will take at least this long.  Waiting leaves time for stabilization.
+    else:
+        print("Starting 60 second wait.")
+        time.sleep(60)  # It will take at least this long.  Waiting leaves time for stabilization.
+
+    wait_for_all_rollouts()
 
 
 if __name__ == "__main__":
-    run()
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Run horizontal scaling experiment')
+    parser.add_argument('bucket_name_prefix', type=str, help='Prefix for bucket names (required)')
+    parser.add_argument('--replicas', type=int, nargs='+', default=[1, 2, 4, 8, 16], 
+                        help='List of replica counts to test (default: 1 2 4 8 16)')
+    parser.add_argument('--kubernetes-resource-profile', type=str, default='baseline',
+                        help='Kubernetes resource profile to use (default: baseline)')
+    parser.add_argument('--times', type=str, nargs='+', default=['10m'],
+                        help='List of time expressions for tests (default: 10m)')
+    parser.add_argument('--users', type=int, nargs='+', default=[75],
+                        help='List of user counts to test (default: 75)')
+    parser.add_argument('--iterations', type=int, default=30,
+                        help='Number of iterations per configuration (default: 30)')
+    parser.add_argument('--no-validate', action='store_false', dest='validate',
+                        help='Skip environment validation')
+    parser.add_argument('--no-wait-for-cooling', action='store_false', dest='wait_for_cooling_before_run',
+                        help='Skip waiting for cooling before run')
+    
+    args = parser.parse_args()
+    
+    run(
+        replicas=args.replicas,
+        kubernetes_resource_profile=args.kubernetes_resource_profile,
+        times=args.times,
+        users=args.users,
+        iterations=args.iterations,
+        bucket_name_prefix=args.bucket_name_prefix,
+        validate=args.validate,
+        wait_for_cooling_before_run=args.wait_for_cooling_before_run
+    )
