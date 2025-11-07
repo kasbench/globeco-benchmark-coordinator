@@ -12,6 +12,7 @@ from common import get_threshold_lookup, ensure_bucket_exists, file_count, file_
     scale_microservice_deployments, initialize_databases, initialize_environments_for_resource_trial, \
     validate_environments, wait_for_all_rollouts, wait_for_cooling, save_to_minio, run_test_in_kubernetes
 from constants import NODE_METRICS, microservices
+from common import minio_client
 
 
 def get_kubernetes_resources(version_name: str) -> list[dict[str, dict[str, str]] | Any] | None:
@@ -113,7 +114,7 @@ def run(replicas:list[int]=None, kubernetes_resource_profile:str= "baseline", ti
 
     # Process arguments
     if replicas is None:
-        replicas = [1, 2, 4, 8, 16]
+        replicas = [1, 2, 4, 6]
     if users is None:
         users = [75]
     if times is None:
@@ -121,7 +122,6 @@ def run(replicas:list[int]=None, kubernetes_resource_profile:str= "baseline", ti
     if bucket_name_prefix is None:
         raise ValueError("bucket_name_prefix cannot be None")
 
-    minio_client = common.minio_client()
     kubernetes_resources = get_kubernetes_resources(kubernetes_resource_profile)
 
     thermal_threshold_lookup = get_threshold_lookup()
@@ -149,15 +149,17 @@ def run(replicas:list[int]=None, kubernetes_resource_profile:str= "baseline", ti
         try:
             print(f"Starting trial: {trial}")
             
+            print("Wait up to 15 minutes for cooling")
+            if wait_for_cooling_before_run:
+                wait_for_cooling(thermal_threshold_lookup, max_wait_seconds=900)
+
             print("Setting CPU governor to performance mode")
             ssh.set_cpu_governor_to_performance(revert=True)
 
             initialize(kubernetes_resources, trial["replica"], validate)
             time.sleep(10)  # Stabilization
             
-            print("Wait up to 5 minutes for cooling")
-            if wait_for_cooling_before_run:
-                wait_for_cooling(thermal_threshold_lookup)
+            
             
             ssh.set_cpu_governor_to_performance()
             
@@ -231,8 +233,8 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Run horizontal scaling experiment')
     parser.add_argument('bucket_name_prefix', type=str, help='Prefix for bucket names (required)')
-    parser.add_argument('--replicas', type=int, nargs='+', default=[1, 2, 4, 8, 16], 
-                        help='List of replica counts to test (default: 1 2 4 8 16)')
+    parser.add_argument('--replicas', type=int, nargs='+', default=[1, 2, 4, 6], 
+                        help='List of replica counts to test (default: 1 2 4 6)')
     parser.add_argument('--kubernetes-resource-profile', type=str, default='baseline',
                         help='Kubernetes resource profile to use (default: baseline)')
     parser.add_argument('--times', type=str, nargs='+', default=['10m'],

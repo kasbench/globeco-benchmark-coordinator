@@ -10,7 +10,8 @@ from collections import defaultdict
 import kr8s
 from kr8s.objects import StatefulSet
 from minio import S3Error, Minio
-
+import kafka_reinit_simple
+import thermal_metrics_collector
 from constants import namespace, microservices
 
 
@@ -242,6 +243,7 @@ def wait_for_cooling(threshold_lookup, max_wait_seconds=600):
                 request[node].append(metric)
                 # print(f"Still need {metric} for {node}")
         if len(request) == 0:
+            print("All nodes cooled")
             return
 
         if time.time() - start_time > max_wait_seconds:
@@ -571,8 +573,8 @@ def run_test_in_kubernetes(time_expression="5m", user_count="1", spawn_rate="1",
     command_line = [
         "uv", "run", "locust", "-f", "./scripts/end_to_end_sequential.py",
         "--host=http://globeco-portfolio-management-portal:3000",
-        "--headless", "-t", time_expression, "-u", user_count,
-        "--spawn-rate", spawn_rate, "--json", "--skip-log", "--only-summary", "--reset-stats",
+        "--headless", "-t", time_expression, "-u", str(user_count),
+        "--spawn-rate", str(spawn_rate), "--json", "--skip-log", "--only-summary", "--reset-stats",
         "--loglevel", "ERROR", "EndToEndUser"
     ]
 
