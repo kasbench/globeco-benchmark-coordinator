@@ -107,6 +107,20 @@ def initialize_only(kubernetes_resource_profile:str= "baseline", replicas=1, val
     kubernetes_resources = get_kubernetes_resources(kubernetes_resource_profile)
     initialize(kubernetes_resources, replicas, validate=validate)
 
+# Add method to execute the following kubectl command and save the results:
+# kubectl exec -it svc/globeco-debug-tools -- psql -h globeco-trade-service-postgresql -U postgres -c "select sum(quantity_ordered) "quantity_ordered", sum(quantity_placed) "quantity_placed", sum(quantity_filled) "quantity_filled" from execution;"
+
+def get_roundtrip_trade_results(bucket_name, trial):
+    filename = make_trial_file_name(trial, "-roundrip.json")
+    command = 'kubectl exec -it svc/globeco-debug-tools -- psql -h globeco-trade-service-postgresql -U postgres -tAc "select json_agg(t) from (select sum(quantity_ordered) quantity_ordered, sum(quantity_placed) quantity_placed, sum(quantity_filled) quantity_filled from execution) t;"'
+    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    # sample output: [{"quantity_ordered":30210.00000000,"quantity_placed":30210.00000000,"quantity_filled":30165.00000000}]
+    print(f"Saving {bucket_name}/{filename}")
+    with tempfile.NamedTemporaryFile(mode='w+', delete=True) as tmp:
+        tmp.write(result.stdout)
+        minio_client.fput_object(bucket_name, filename, tmp.name)
+
+
 
 
 def run(replicas:list[int]=None, kubernetes_resource_profile:str= "baseline", times:list[str]=None, users:list[int]=None,
@@ -132,11 +146,13 @@ def run(replicas:list[int]=None, kubernetes_resource_profile:str= "baseline", ti
     extensions = ["-logs.txt", "-cpu-usage.parquet",  "-cpu-throttled.parquet", "-memory-wsb.parquet"]
     log_extension = extensions[0]
     metric_extensions = extensions[1:]
-    bucket_extensions = ["-logs-raw", "-cpu-usage",  "-cpu-throttled", "-memory-wsb"]
+    bucket_extensions = ["-logs-raw", "-roundtrip", "-cpu-usage",  "-cpu-throttled", "-memory-wsb"]
     bucket_names = [f"{bucket_name_prefix}{bucket_extension}" for bucket_extension in bucket_extensions]
     node_bucket_name = f"{bucket_name_prefix}-node"
     log_bucket_name = bucket_names[0]
-    metric_bucket_names = bucket_names[1:]
+    roundtrip_bucket_name = bucket_names[1]
+    metric_bucket_names = bucket_names[2:]
+    
 
     for bucket_name in bucket_names:
         ensure_bucket_exists(minio_client, bucket_name)
@@ -175,6 +191,7 @@ def run(replicas:list[int]=None, kubernetes_resource_profile:str= "baseline", ti
             
             filename = make_trial_file_name(trial, log_extension)
             save_to_minio(minio_client, raw_output, log_bucket_name, filename)
+            get_roundtrip_trade_results(roundtrip_bucket_name, trial)
             for metric, metric_bucket_name, metric_extension, calculate_rate in zip(metrics, metric_bucket_names,
                                                                                     metric_extensions,
                                                                                     calculate_rates):
@@ -226,6 +243,8 @@ def initialize(kubernetes_resources: list[dict[str, dict[str, str]] | Any] | Non
         time.sleep(60)  # It will take at least this long.  Waiting leaves time for stabilization.
 
     wait_for_all_rollouts()
+
+
 
 
 if __name__ == "__main__":
