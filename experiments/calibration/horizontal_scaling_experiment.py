@@ -1,4 +1,6 @@
 import os
+import subprocess
+import tempfile
 import traceback
 from datetime import datetime, timedelta
 import random
@@ -165,6 +167,9 @@ def run(replicas:list[int]=None, kubernetes_resource_profile:str= "baseline", ti
         try:
             print(f"Starting trial: {trial}")
             
+            # scale down microservices
+            print("Scaling down microservices") 
+            scale_microservice_deployments(0)
             print("Wait up to 15 minutes for cooling")
             if wait_for_cooling_before_run:
                 wait_for_cooling(thermal_threshold_lookup, max_wait_seconds=900)
