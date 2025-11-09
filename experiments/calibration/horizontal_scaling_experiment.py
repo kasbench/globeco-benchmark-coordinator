@@ -114,7 +114,7 @@ def initialize_only(kubernetes_resource_profile:str= "baseline", replicas=1, val
 
 def get_roundtrip_trade_results(bucket_name, trial):
     filename = make_trial_file_name(trial, "-roundrip.json")
-    command = 'kubectl exec -it svc/globeco-debug-tools -- psql -h globeco-trade-service-postgresql -U postgres -tAc "select json_agg(t) from (select sum(quantity_ordered) quantity_ordered, sum(quantity_placed) quantity_placed, sum(quantity_filled) quantity_filled from execution) t;"'
+    command = 'kubectl exec svc/globeco-debug-tools -- psql -h globeco-trade-service-postgresql -U postgres -tAc "select json_agg(t) from (select sum(quantity_ordered) quantity_ordered, sum(quantity_placed) quantity_placed, sum(quantity_filled) quantity_filled from execution) t;"'
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     # sample output: [{"quantity_ordered":30210.00000000,"quantity_placed":30210.00000000,"quantity_filled":30165.00000000}]
     print(f"Saving {bucket_name}/{filename}")
