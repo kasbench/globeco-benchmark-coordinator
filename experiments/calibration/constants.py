@@ -18,6 +18,7 @@ NODES = (('server', 4, 'rpi'),
          ('node-3', 16, 'amd'),
          ('node-4', 16, 'amd'),
          ('node-5', 16, 'amd'),
+         ('node-6', 16, 'amd'),
         )
 
 METRICS = {
@@ -39,4 +40,6 @@ NODE_METRICS = {
     "node-3": ["k10temp_pci_00c3", "amdgpu_pci_0400", "acpitz_acpi_0", "nvme_pci_0100"],
     "node-4": ["k10temp_pci_00c3", "amdgpu_pci_0400", "acpitz_acpi_0", "nvme_pci_0100"],
     "node-5": ["k10temp_pci_00c3", "amdgpu_pci_0400", "acpitz_acpi_0", "nvme_pci_0100"],
+    "node-6": ["k10temp_pci_00c3", "amdgpu_pci_0400", "acpitz_acpi_0", "nvme_pci_0100"],
 }
+TOTAL_NODE_METRICS = sum([len(metrics) for metrics in NODE_METRICS.values()])

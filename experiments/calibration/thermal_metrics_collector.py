@@ -74,6 +74,7 @@ NODES = (('server', 4, 'rpi'),
          ('node-3', 16, 'amd'),
          ('node-4', 16, 'amd'),
          ('node-5', 16, 'amd'),
+         ('node-6', 16, 'amd')
         )
 
 NODE_CPU = {node: cpu for node, _, cpu in NODES}

@@ -9,6 +9,7 @@ nodes = (('node-0', 4, 'ondemand'),
          ('node-3', 16, 'powersave'),
          ('node-4', 16, 'powersave'),
          ('node-5', 16, 'powersave'),
+         ('node-6', 16, 'powersave')
         )
 
 
