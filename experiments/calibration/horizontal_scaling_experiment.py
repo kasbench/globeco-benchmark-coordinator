@@ -112,15 +112,25 @@ def initialize_only(kubernetes_resource_profile:str= "baseline", replicas=1, val
 # Add method to execute the following kubectl command and save the results:
 # kubectl exec -it svc/globeco-debug-tools -- psql -h globeco-trade-service-postgresql -U postgres -c "select sum(quantity_ordered) "quantity_ordered", sum(quantity_placed) "quantity_placed", sum(quantity_filled) "quantity_filled" from execution;"
 
+
 def get_roundtrip_trade_results(bucket_name, trial):
     filename = make_trial_file_name(trial, "-roundrip.json")
     command = 'kubectl exec svc/globeco-debug-tools -- psql -h globeco-trade-service-postgresql -U postgres -tAc "select json_agg(t) from (select sum(quantity_ordered) quantity_ordered, sum(quantity_placed) quantity_placed, sum(quantity_filled) quantity_filled from execution) t;"'
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    output = result.stdout.strip()
+    print(f"Roundtrip trade results: {output}")
+    if result.returncode != 0:
+        print(f"Error executing command: {result.stderr}")
+        raise RuntimeError(f"Command failed with return code {result.returncode}")  
+    if not output.startswith("[") or not output.endswith("]"):
+        raise ValueError(f"Unexpected output format: {output}")
     # sample output: [{"quantity_ordered":30210.00000000,"quantity_placed":30210.00000000,"quantity_filled":30165.00000000}]
     print(f"Saving {bucket_name}/{filename}")
     with tempfile.NamedTemporaryFile(mode='w+', delete=True) as tmp:
-        tmp.write(result.stdout)
+        tmp.write(output)
+        tmp.flush()
         minio_client.fput_object(bucket_name, filename, tmp.name)
+
 
 
 
@@ -130,7 +140,7 @@ def run(replicas:list[int]=None, kubernetes_resource_profile:str= "baseline", ti
 
     # Process arguments
     if replicas is None:
-        replicas = [1, 2, 4, 6]
+        replicas = [1, 2, 4, 6, 8]
     if users is None:
         users = [75]
     if times is None:
@@ -160,8 +170,10 @@ def run(replicas:list[int]=None, kubernetes_resource_profile:str= "baseline", ti
         ensure_bucket_exists(minio_client, bucket_name)
     ensure_bucket_exists(minio_client, node_bucket_name)
 
+    print("Generating trials")
     trials = get_trials(replicas, times, users, iterations)
 
+    print("Waiting for trials to complete")
     while trial := get_next_trial(minio_client, trials, log_bucket_name, log_extension, metric_bucket_names, metric_extensions):
 
         try:
@@ -170,8 +182,8 @@ def run(replicas:list[int]=None, kubernetes_resource_profile:str= "baseline", ti
             # scale down microservices
             print("Scaling down microservices") 
             scale_microservice_deployments(0)
-            print("Wait up to 15 minutes for cooling")
             if wait_for_cooling_before_run:
+                print("Wait up to 15 minutes for cooling")
                 wait_for_cooling(thermal_threshold_lookup, max_wait_seconds=900)
 
             print("Setting CPU governor to performance mode")
@@ -257,8 +269,8 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Run horizontal scaling experiment')
     parser.add_argument('bucket_name_prefix', type=str, help='Prefix for bucket names (required)')
-    parser.add_argument('--replicas', type=int, nargs='+', default=[1, 2, 4, 6], 
-                        help='List of replica counts to test (default: 1 2 4 6)')
+    parser.add_argument('--replicas', type=int, nargs='+', default=[1, 2, 4, 6, 8], 
+                        help='List of replica counts to test (default: 1 2 4 6 8)')
     parser.add_argument('--kubernetes-resource-profile', type=str, default='baseline',
                         help='Kubernetes resource profile to use (default: baseline)')
     parser.add_argument('--times', type=str, nargs='+', default=['10m'],

@@ -490,7 +490,9 @@ def initialize_environments_for_trial(trial,  replicas=1):
     set_state(states, replicas)
 
 
-def initialize_environments_for_resource_trial(replicas=1, overrides=[]):
+def initialize_environments_for_resource_trial(replicas=1, overrides=None):
+    if overrides is None:
+        overrides = []
     states = get_microservice_states(overrides)
     set_state(states, replicas)
 

@@ -413,15 +413,24 @@ def run_baseline_idle_sample(bucket_name, num_trials, trial_length):
         start_time = datetime.now()
         end_time = start_time + timedelta(minutes=trial_length)
 
+        if file_count(minio_client, bucket_name) >= num_trials * TOTAL_NODE_METRICS:
+            print(f"All trials completed.  Exiting.")
+            break
+
         i = random.randint(0, num_trials)
         
         # Skip if all the files for this iteration are complete
+        all_files_exist = True
         for node, node_metrics in NODE_METRICS.items():
             for metric in node_metrics:
                 filename = f"trial-{i}-idle-{node}-{metric}.parquet"
                 if not file_exists(minio_client, bucket_name, filename):
+                    all_files_exist = False
                     break
-        else:        
+            if not all_files_exist:
+                break
+            
+        if all_files_exist:        
             print(f"Trial {i} already completed.  Skipping.")
             continue
         
@@ -461,7 +470,8 @@ def run_baseline_idle_sample(bucket_name, num_trials, trial_length):
         if trial_success:
             print(f"Completed idle trial {i} from {start_time} to {end_time}")  
         else:
-            print(f"Trial {i} failed")              
+            print(f"Trial {i} failed")     
+        print("Waiting 150 seconds before next trial...")         
         time.sleep(150) # 2 minute 30 second gap between trials (150 seconds)
 
 
@@ -490,7 +500,7 @@ def run_experiment_1(bucket_name_prefix="experiment-1", microservices=None, repl
 
     trial_length_num = int(trial_length.replace("m", ""))
     
-    run_baseline_idle_sample(f"{bucker_name_prefix}-idle", len(trial_numbers), trial_length_num)
+    run_baseline_idle_sample(f"{bucket_name_prefix}-idle", len(trial_numbers), trial_length_num)
     
 
 
