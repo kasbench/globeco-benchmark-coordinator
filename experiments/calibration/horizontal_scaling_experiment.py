@@ -62,7 +62,7 @@ def get_trials(replicas:list[int], times:list[str], users:list[int], iterations:
 
 
 def make_trial_file_name(trial:dict, extension:str) -> str:
-    filename = f"trial_{trial["user"]}_{trial['replica']}_{trial['time']}{extension}"
+    filename = f"trial_{trial["user"]}_{trial['replica']}_{trial['time']}_{trial['iteration']}{extension}"
     return filename
 
 
