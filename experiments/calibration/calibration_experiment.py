@@ -494,13 +494,38 @@ def run_experiment_1(bucket_name_prefix="experiment-1", microservices=None, repl
         microservices=microservices,
         trial_numbers=trial_numbers, 
         trial_lengths=[trial_length], 
-        trial_users=["50"])
+        trial_users=trial_users)
 
     # The following runs provided the idle baseline data for experiment 1
+
+    time.sleep(300) # 5 minute gap between experiments
 
     trial_length_num = int(trial_length.replace("m", ""))
     
     run_baseline_idle_sample(f"{bucket_name_prefix}-idle", len(trial_numbers), trial_length_num)
+    
+
+def run_experiment_3(bucket_name_prefix="experiment-3", microservices=None, replicas=1,  trial_numbers = None,
+    trial_length="240m", trial_users = None):
+    if microservices is None:
+        microservices = ['globeco-allocation-service', 'globeco-confirmation-service', 
+                 'globeco-execution-service', 
+                 'globeco-fix-engine', 'globeco-order-service', 
+                 'globeco-portfolio-accounting-service', 'globeco-portfolio-management-portal', 
+                 'globeco-portfolio-service', 'globeco-pricing-service', 'globeco-security-service',
+                 'globeco-trade-service', 'globeco-order-generation-service']
+    if trial_numbers is None:
+        trial_numbers = list(range(7))
+    if trial_users is None:
+        trial_users = ["75"]
+    run_resource_utilization_sample(
+        bucket_name_prefix=bucket_name_prefix, 
+        replicas=replicas, 
+        microservices=microservices,
+        trial_numbers=trial_numbers, 
+        trial_lengths=[trial_length], 
+        trial_users=trial_users)
+
     
 
 
