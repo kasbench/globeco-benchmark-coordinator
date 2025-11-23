@@ -14,7 +14,7 @@ def main():
     parser.add_argument(
         "--bucket-name-prefix",
         type=str,
-        default="experiment-1",
+        default="experiment-3",
         help="Prefix for MinIO bucket names (default: experiment-3)"
     )
     
@@ -44,8 +44,8 @@ def main():
     parser.add_argument(
         "--trial-length",
         type=str,
-        default="10m",
-        help="Length of each trial (default: 240m)"
+        default="120m",
+        help="Length of each trial (default: 120m)"
     )
     
     parser.add_argument(
@@ -57,6 +57,14 @@ def main():
     )
     
     args = parser.parse_args()
+
+    print("Starting Experiment 3 with the following parameters:")
+    print(f"Bucket Name Prefix: {args.bucket_name_prefix}")
+    print(f"Microservices: {args.microservices}")
+    print(f"Replicas: {args.replicas}")
+    print(f"Trial Numbers: {args.trial_numbers}")
+    print(f"Trial Length: {args.trial_length}")
+    print(f"Trial Users: {args.trial_users}")
     
     run_experiment_3(
         bucket_name_prefix=args.bucket_name_prefix,

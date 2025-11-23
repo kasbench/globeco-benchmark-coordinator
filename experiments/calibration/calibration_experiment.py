@@ -506,7 +506,7 @@ def run_experiment_1(bucket_name_prefix="experiment-1", microservices=None, repl
     
 
 def run_experiment_3(bucket_name_prefix="experiment-3", microservices=None, replicas=1,  trial_numbers = None,
-    trial_length="240m", trial_users = None):
+    trial_length="120m", trial_users = None):
     if microservices is None:
         microservices = ['globeco-allocation-service', 'globeco-confirmation-service', 
                  'globeco-execution-service', 
@@ -515,9 +515,15 @@ def run_experiment_3(bucket_name_prefix="experiment-3", microservices=None, repl
                  'globeco-portfolio-service', 'globeco-pricing-service', 'globeco-security-service',
                  'globeco-trade-service', 'globeco-order-generation-service']
     if trial_numbers is None:
-        trial_numbers = list(range(7))
+        trial_numbers = list(range(200))
     if trial_users is None:
         trial_users = ["75"]
+    print(f"Running Experiment 3: {bucket_name_prefix} with {replicas} replicas.")  
+    print(f"Microservices: {microservices}")
+    print(f"Trial Numbers: {trial_numbers}")
+    print(f"Trial Length: {trial_length}")
+    print(f"Trial Users: {trial_users}")
+
     run_resource_utilization_sample(
         bucket_name_prefix=bucket_name_prefix, 
         replicas=replicas, 

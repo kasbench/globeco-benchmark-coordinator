@@ -599,10 +599,16 @@ def run_test_in_kubernetes(time_expression="5m", user_count="1", spawn_rate="1",
         # Follow logs until pod completes
         logs_result = subprocess.run([
             "kubectl", "logs", "-f", pod_name, "-n", namespace,
-        ], capture_output=True, text=True, timeout=600)
+        ], capture_output=True, text=True)    # Removed timeout for long runs
 
         # Clean up
         subprocess.run(["kubectl", "delete", "pod", pod_name, "-n", namespace])
+
+        print("Standard Error:")
+        try:
+            print(logs_result.stderr)
+        except Exception as e:
+            print(f"Error printing standard error: {e}")    
 
         # Return results
 
