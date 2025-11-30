@@ -47,7 +47,7 @@ def create_cash_transaction(portfolio_id: int) -> list[dict]:
     return transaction
 
 
-def post_transactions(client, transactions, max_post=50, url='http://globeco-portfolio-accounting-service:8087/api/v1'):
+def post_transactions(client, transactions, max_post=50):
     """
     Post transactions to the portfolio accounting service.  This should be changed to use the portal client.
     """
