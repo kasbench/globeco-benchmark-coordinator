@@ -1,0 +1,9 @@
+include README.md
+include LICENSE
+recursive-include common *.py
+recursive-include scripts *.py
+recursive-include debugging *.py
+exclude *.log
+exclude *.db
+exclude .DS_Store
+exclude run.sh

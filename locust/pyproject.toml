@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "locustscripts"
+version = "0.1.0"
+description = "Locust load testing scripts and utilities"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "locust>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["common*", "scripts*", "debugging*"]
