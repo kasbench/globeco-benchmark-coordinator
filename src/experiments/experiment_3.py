@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""
+Command-line interface for running Experiment 3.
+"""
+import argparse
+from calibration_experiment import run_experiment_3
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Run Experiment 3 calibration tests"
+    )
+    
+    parser.add_argument(
+        "--bucket-name-prefix",
+        type=str,
+        default="experiment-3",
+        help="Prefix for MinIO bucket names (default: experiment-3)"
+    )
+    
+    parser.add_argument(
+        "--microservices",
+        type=str,
+        nargs="+",
+        default=None,
+        help="List of microservices to test (default: all microservices)"
+    )
+    
+    parser.add_argument(
+        "--replicas",
+        type=int,
+        default=1,
+        help="Number of replicas for each microservice (default: 1)"
+    )
+    
+    parser.add_argument(
+        "--trial-numbers",
+        type=int,
+        nargs="+",
+        default=None,
+        help="List of trial numbers to run (default: 0-199)"
+    )
+    
+    parser.add_argument(
+        "--trial-length",
+        type=str,
+        default="120m",
+        help="Length of each trial (default: 120m)"
+    )
+    
+    parser.add_argument(
+        "--trial-users",
+        type=str,
+        nargs="+",
+        default=None,
+        help="List of user counts to test (default: ['75'])"
+    )
+    
+    args = parser.parse_args()
+
+    print("Starting Experiment 3 with the following parameters:")
+    print(f"Bucket Name Prefix: {args.bucket_name_prefix}")
+    print(f"Microservices: {args.microservices}")
+    print(f"Replicas: {args.replicas}")
+    print(f"Trial Numbers: {args.trial_numbers}")
+    print(f"Trial Length: {args.trial_length}")
+    print(f"Trial Users: {args.trial_users}")
+    
+    run_experiment_3(
+        bucket_name_prefix=args.bucket_name_prefix,
+        microservices=args.microservices,
+        replicas=args.replicas,
+        trial_numbers=args.trial_numbers,
+        trial_length=args.trial_length,
+        trial_users=args.trial_users
+    )
+
+
+if __name__ == "__main__":
+    main()
