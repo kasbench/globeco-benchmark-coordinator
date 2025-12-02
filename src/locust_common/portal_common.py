@@ -3,7 +3,7 @@ import random
 import uuid
 import time
 
-import common.portal_client as portal_client
+import locust_common.portal_client as portal_client
 
 
 PORTFOLIOS_PER_MODEL = 10
