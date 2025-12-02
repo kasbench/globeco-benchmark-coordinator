@@ -43,11 +43,8 @@ def get_next_resource_trial(
     all_buckets = [log_bucket_name] + metric_bucket_names
     all_extensions = [log_extension] + metric_extensions
 
-    
-
     trial_set = set(trials)
     
-    # If not, pick one that has not been completed
     while True:
         if len(trial_set) == 0:
             print("All trials complete")
@@ -60,8 +57,6 @@ def get_next_resource_trial(
                 print(f"File {bucket_name}/{filename} does not exist for {trial}")
                 return trial
         trial_set.remove(trial)
-
-
 
 
 def run(
