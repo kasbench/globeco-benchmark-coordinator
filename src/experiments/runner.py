@@ -179,8 +179,7 @@ def run(
                 subprocess.run(command_line, check=True, stdout=subprocess.DEVNULL)
             except Exception as e:
                 print(f"Error: {e}")
-                raise
-
+                
             end_time = datetime.now()
 
             ssh.set_cpu_governor_to_performance(revert=True)    
