@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 from common import scale_microservice_deployments, minio_client
 from ssh import set_cpu_governor_to_performance

@@ -1,6 +1,6 @@
 ./experiments/runner.py \
---bucket-name-prefix experiment-3-eda \
---trial-lengths-minutes 720 \
---users 75 \
---trial-numbers -4 \
+--bucket-name-prefix experiment-2-20251207 \
+--trial-lengths-minutes 5 \
+--users 10 20 30 40 50 60 70 80 \
+--trial-numbers -60 \
 --host http://globeco.local:32080
