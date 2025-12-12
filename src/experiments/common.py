@@ -22,7 +22,7 @@ minio_client = Minio(
         secure=False  # Set to True for production with TLS
     )
 
-def get_pods():
+def get_pods(namespace="globeco"):
     return kr8s.get("pods", namespace=namespace)
 
 
@@ -278,6 +278,38 @@ def get_microservice_states(overrides):
 
     return states
 
+def get_overrides_for_profile(resource_profile):
+    
+    if resource_profile == "default":
+        return []
+    if resource_profile == "recommendation-1":
+        return [
+            {'globeco-allocation-service': {'cpu_request': '200m', 'cpu_limit': '200m', 
+                                            'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+            {'globeco-confirmation-service': {'cpu_request': '200m', 'cpu_limit': '200m',
+                                            'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+            {'globeco-execution-service': {'cpu_request': '429m', 'cpu_limit': '429m',
+                                        'memory_request': '500Mi', 'memory_limit': '500Mi'}},
+            {'globeco-fix-engine': {'cpu_request': '200m', 'cpu_limit': '200m',
+                                    'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+            {'globeco-order-generation-service': {'cpu_request': '1', 'cpu_limit': '1',
+                                    'memory_request': '500Mi', 'memory_limit': '500Mi'}},
+            {'globeco-order-service': {'cpu_request': '914m', 'cpu_limit': '914m',
+                                    'memory_request': '500Mi', 'memory_limit': '500Mi'}},
+            {'globeco-portfolio-accounting-service': {'cpu_request': '200m', 'cpu_limit': '200m',
+                                                    'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+            {'globeco-portfolio-management-portal': {'cpu_request': '366m', 'cpu_limit': '366m',
+                                                    'memory_request': '200Mi', 'memory_limit': '200Mi'}},
+            {'globeco-portfolio-service': {'cpu_request': '200m', 'cpu_limit': '200m',
+                                        'memory_request': '300Mi', 'memory_limit': '300Mi'}},
+            {'globeco-pricing-service': {'cpu_request': '607m', 'cpu_limit': '607m',
+                                        'memory_request': '500Mi', 'memory_limit': '500Mi'}},
+            {'globeco-security-service': {'cpu_request': '296m', 'cpu_limit': '296m',
+                                        'memory_request': '100Mi', 'memory_limit': '100Mi'}},
+            {'globeco-trade-service': {'cpu_request': '741m', 'cpu_limit': '741m',
+                                    'memory_request': '500Mi', 'memory_limit': '500Mi'}}
+        ]
+    raise RuntimeError(f"Invalid resource profile: {resource_profile}")
 
 def cpu_add(original_cpu, additional_cpu):
     original_value = int(original_cpu[:-1])
@@ -494,11 +526,15 @@ def initialize_environments_for_trial(trial,  replicas=1):
     set_state(states, replicas)
 
 
-def initialize_environments_for_resource_trial(replicas=1, overrides=None):
+def initialize_environments_for_resource_trial(replicas=1, overrides=None, resource_profile=None):
+    # Resource profiles trump overrides
     if overrides is None:
         overrides = []
+    if resource_profile is not None:
+        overrides = get_overrides_for_profile(resource_profile)
     states = get_microservice_states(overrides)
     set_state(states, replicas)
+    return overrides
 
 
 def cpu_equal(cpu1, cpu2):

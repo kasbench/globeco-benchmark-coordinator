@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "gevent>=25.5.1",
     "greenlet>=3.2.4",
+    "humanize>=4.14.0",
     "jupyterlab>=4.4.5",
     "kr8s>=0.20.10",
     "locust>=2.37.14",

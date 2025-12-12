@@ -7,6 +7,7 @@ import traceback
 from datetime import datetime, timedelta
 import random
 import argparse
+import pytz
     
 
 from minio import Minio
@@ -16,6 +17,7 @@ from common import get_threshold_lookup, ensure_bucket_exists, scale_microservic
     initialize_databases, initialize_environments_for_resource_trial, validate_environments, wait_for_all_rollouts, \
     wait_for_cooling, save_to_minio, file_exists
 from constants import NODE_METRICS
+from environment_check import validate_environment_health_during_trial, get_pod_restarts_for_namespace
 
 
 def get_resource_trials(trial_numbers=list(range(30)), 
@@ -73,7 +75,8 @@ def run(
         wait_for_cooling_before_run = False,
         skip_initialization = True, 
         host = "http://globeco-portfolio-management-portal:3000",
-        collect_thermal_metrics = False
+        collect_thermal_metrics = False,
+        tz="America/New_York"
     ):
 
     if trial_numbers and len(trial_numbers) == 1 and trial_numbers[0] < 0:
@@ -88,6 +91,9 @@ def run(
         microservices = ["all"]
     if overrides is None:
         overrides = []
+
+    if overrides and resource_profile != "default":
+        raise RuntimeError("Cannot specify overrides and resource_profile at the same time")
         
     minio_client = Minio(
         "minio:9000",  
@@ -120,6 +126,9 @@ def run(
             trial_users=[str(tu) for tu in users])
 
     ssh.set_cpu_governor_to_performance(revert=True) ## Ensure we start in default state
+    error_log_name = f"error_log_{datetime.now().strftime('%Y%m%d%H%M%S')}.txt"
+    print(f"Error log: {error_log_name}")   
+    number_of_errors = 0 
     
     while trial := get_next_resource_trial(
             minio_client, 
@@ -138,7 +147,7 @@ def run(
                 print("Initializing databases")
                 initialize_databases()
                 print("Initializing environments for resource trial")
-                initialize_environments_for_resource_trial(replicas=replicas, overrides=overrides)
+                overrides = initialize_environments_for_resource_trial(replicas=replicas, overrides=overrides, resource_profile=resource_profile)
                 print("Environment Initialized.")
                 if validate:
                     print("Waiting for 15 seconds before validation...")
@@ -155,9 +164,15 @@ def run(
             if wait_for_cooling_before_run: 
                 print("Wait up to 5 minutes for cooling")
                 wait_for_cooling(threshold_lookup)
+            
             print("Setting CPU governor to performance mode")
             ssh.set_cpu_governor_to_performance()
+            stability_start_time = datetime.now()
+
+            prior_pod_restarts = get_pod_restarts_for_namespace()
             start_time = datetime.now()
+            tz_object = pytz.timezone(tz)
+            start_time_tz = datetime.now(tz=tz_object)
             print(f"Start time: {start_time.strftime("%Y-%m-%d %H:%M:%S")}")
 
             trial_num, trial_length, trial_users = trial
@@ -181,11 +196,13 @@ def run(
                 print(f"Error: {e}")
                 
             end_time = datetime.now()
+            end_time_tz = datetime.now(tz=tz_object)
 
             ssh.set_cpu_governor_to_performance(revert=True)    
             print(f"End time: {end_time.strftime("%Y-%m-%d %H:%M:%S")}")
-            # filename = make_resource_trial_file_name(trial, "")
-            # save_to_minio(minio_client, log_db_filename, log_bucket_name, log_db_filename)
+            
+            validate_environment_health_during_trial(start_time_tz, end_time_tz, prior_pod_restarts, tz="America/New_York")
+            
             minio_client.fput_object(log_bucket_name, log_db_minio_filename, log_db_filename)
             os.remove(log_db_filename)
 
@@ -209,6 +226,10 @@ def run(
 
         except Exception as e:
             print(f"Error in trial {trial}: {e}.\n{traceback.format_exc()}")
+            with open(error_log_name, "a") as f:
+                number_of_errors += 1
+                f.write(f"Error {number_of_errors} at {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n")
+                f.write(f"Error in trial {trial}: {e}.\n{traceback.format_exc()}\n")
             continue
             
     ssh.set_cpu_governor_to_performance(revert=True)    
