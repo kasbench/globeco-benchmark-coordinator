@@ -170,6 +170,7 @@ def run(
             stability_start_time = datetime.now()
 
             prior_pod_restarts = get_pod_restarts_for_namespace()
+            prior_pod_conditions = get_pod_conditions(namespace="globeco", raise_exception_on_not_ready=True)
             start_time = datetime.now()
             tz_object = pytz.timezone(tz)
             start_time_tz = datetime.now(tz=tz_object)
@@ -202,7 +203,10 @@ def run(
             print(f"End time: {end_time.strftime("%Y-%m-%d %H:%M:%S")}")
             
             validate_environment_health_during_trial(start_time_tz, end_time_tz, prior_pod_restarts, tz="America/New_York")
-            
+            post_pod_conditions = get_pod_conditions(namespace="globeco", raise_exception_on_not_ready=False)
+            if pre_pod_conditions != post_pod_conditions:
+                print("Pod conditions changed during trial.  Skipping data collection.")
+                continue
             minio_client.fput_object(log_bucket_name, log_db_minio_filename, log_db_filename)
             os.remove(log_db_filename)
 

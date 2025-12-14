@@ -684,3 +684,35 @@ def run_test_in_kubernetes(time_expression="5m", user_count="1", spawn_rate="1",
     except Exception as e:
         subprocess.run(["kubectl", "delete", "pod", pod_name])
         raise e
+
+
+def get_pod_condition(pod):
+    is_running = pod.status.phase == 'Running'
+
+    conditions = pod.status.conditions
+    last_ready_transition_time = None
+    for condition in conditions:
+        if condition["type"] == "Ready":
+            ready_status = condition["status"]
+            last_ready_transition_time = condition["lastTransitionTime"]
+    return pod.name, {"is_running": is_running, "ready_status": ready_status, "last_ready_transition_time": last_ready_transition_time}
+
+
+def get_pod_conditions(namespace="globeco", raise_exception_on_not_ready=True):
+    api = kr8s.api()
+    pods = api.get("pod", namespace=namespace)
+    
+    results = {}
+    for pod in pods:
+        name, result = get_pod_condition(pod)
+        if raise_exception_on_not_ready:
+            is_running = result["is_running"] # Boolean
+            ready_status = result["ready_status"] # String True or False
+            last_ready_transition_time = result["last_ready_transition_time"]
+            if not is_running:
+                raise Exception(f"Pod {name} is not running")
+            elif ready_status != "True":
+                raise Exception(f"Pod {name} is not ready")
+        results[name] = result
+    return results
+        
