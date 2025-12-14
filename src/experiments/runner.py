@@ -28,9 +28,9 @@ def get_resource_trials(trial_numbers=list(range(30)),
             for trial_user in trial_users]
 
 
-def make_resource_trial_file_name(trial, extension):
+def make_resource_trial_file_name(trial, extension, prefix="trial"):
     trial_num, trial_length, trial_workers = trial
-    return f"trial-{trial_workers}-{trial_length}-{trial_num}{extension}"
+    return f"{prefix}-{trial_workers}-{trial_length}-{trial_num}{extension}"
 
 
 def get_next_resource_trial(
@@ -181,7 +181,9 @@ def run(
 
             log_db_filename = f"/tmp/trial_{trial_users}_{trial_length}_{trial_num}_{datetime.now().strftime('%Y%m%d%H%M%S')}.db"
             log_db_minio_filename = make_resource_trial_file_name(trial, log_extension)
-
+            output_filename = "/tmp/output_log.txt"
+            output_minio_filename = make_resource_trial_file_name(trial, ".txt", prefix="locust_output")
+            
 
             command_line = [
                 "uv", "run", "locust", "-f", "locust_scripts/logging_sequential_end_to_end.py",
@@ -193,7 +195,12 @@ def run(
             ]
 
             try:
-                subprocess.run(command_line, check=True, stdout=subprocess.DEVNULL)
+
+                with open(output_filename, 'w') as f:
+                    subprocess.run(command_line, 
+                    check=True, 
+                    stdout=f,
+                    stderr=f)
             except Exception as e:
                 print(f"Error: {e}")
                 
@@ -209,7 +216,9 @@ def run(
                 print("Pod conditions changed during trial.  Skipping data collection.")
                 continue
             minio_client.fput_object(log_bucket_name, log_db_minio_filename, log_db_filename)
+            minio_client.fput_object(log_bucket_name, output_minio_filename, output_filename)
             os.remove(log_db_filename)
+            os.remove(output_filename)
 
             for metric, metric_bucket_name, metric_extension, calculate_rate in zip(metrics, metric_bucket_names, metric_extensions, calculate_rates):
                 prom = prometheus.get_prometheus_connection()
