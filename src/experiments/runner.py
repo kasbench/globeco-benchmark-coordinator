@@ -15,7 +15,7 @@ from minio import Minio
 import ssh, prometheus
 from common import get_threshold_lookup, ensure_bucket_exists, scale_microservice_deployments, \
     initialize_databases, initialize_environments_for_resource_trial, validate_environments, wait_for_all_rollouts, \
-    wait_for_cooling, save_to_minio, file_exists
+    wait_for_cooling, save_to_minio, file_exists, get_pod_conditions
 from constants import NODE_METRICS
 from environment_check import validate_environment_health_during_trial, get_pod_restarts_for_namespace
 
@@ -169,6 +169,7 @@ def run(
             ssh.set_cpu_governor_to_performance()
             stability_start_time = datetime.now()
 
+            print("Checking pod conditions before trial")
             prior_pod_restarts = get_pod_restarts_for_namespace()
             prior_pod_conditions = get_pod_conditions(namespace="globeco", raise_exception_on_not_ready=True)
             start_time = datetime.now()
@@ -204,7 +205,7 @@ def run(
             
             validate_environment_health_during_trial(start_time_tz, end_time_tz, prior_pod_restarts, tz="America/New_York")
             post_pod_conditions = get_pod_conditions(namespace="globeco", raise_exception_on_not_ready=False)
-            if pre_pod_conditions != post_pod_conditions:
+            if prior_pod_conditions != post_pod_conditions:
                 print("Pod conditions changed during trial.  Skipping data collection.")
                 continue
             minio_client.fput_object(log_bucket_name, log_db_minio_filename, log_db_filename)
