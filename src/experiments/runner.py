@@ -126,7 +126,7 @@ def run(
             trial_users=[str(tu) for tu in users])
 
     ssh.set_cpu_governor_to_performance(revert=True) ## Ensure we start in default state
-    error_log_name = f"error_log_{datetime.now().strftime('%Y%m%d%H%M%S')}.txt"
+    error_log_name = f"/tmp/error_log_{datetime.now().strftime('%Y%m%d%H%M%S')}.txt"
     print(f"Error log: {error_log_name}")   
     number_of_errors = 0 
     
