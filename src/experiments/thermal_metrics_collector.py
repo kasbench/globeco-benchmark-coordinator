@@ -82,7 +82,7 @@ NODE_CPU = {node: cpu for node, _, cpu in NODES}
 METRICS = {
     "k10temp-pci-00c3": "AMD CPU Temperature",
     "amdgpu-pci-0400": "AMD GPU Temperature",
-    "acpitz-acpi-0": "Ambiant Temperature",
+    # "acpitz-acpi-0": "Ambiant Temperature",
     "nvme-pci-0100": "NVMe Temperature",
     "cpu_thermal-virtual-0": "RPI CPU Temperature",
     "rp1_adc-isa-0000": "RPI ADC Temperature",

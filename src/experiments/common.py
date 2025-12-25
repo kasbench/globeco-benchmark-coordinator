@@ -229,6 +229,8 @@ def wait_for_cooling(threshold_lookup, max_wait_seconds=600, exclude_server=Fals
                 continue
             for metric, value in metrics.items():
                 metric = metric.replace("-", "_")
+                if (node, metric) in completed_node_metrics:
+                    continue
                 if exclude_nvme and metric in ["acpitz_acpi_0", "nvme_pci_0100", "nvme_pci_10100"]:      # Excluding
                     continue
                 if value <= threshold_lookup[(node, metric)]:
