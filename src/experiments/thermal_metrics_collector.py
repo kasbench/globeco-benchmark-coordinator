@@ -54,7 +54,7 @@ def preprocess_thermals(thermal, cpu, node):
                 {
                     "k10temp-pci-00c3": thermal["k10temp-pci-00c3"]["Tctl"]["temp1_input"],
                     "amdgpu-pci-0400": thermal["amdgpu-pci-0400"]["edge"]["temp1_input"],
-                    "acpitz-acpi-0": thermal["acpitz-acpi-0"]["temp1"]["temp1_input"],
+                    # "acpitz-acpi-0": thermal["acpitz-acpi-0"]["temp1"]["temp1_input"],
                     "nvme-pci-0100": thermal["nvme-pci-0100"]["Composite"]["temp1_input"]
                 }]
     if cpu == 'rpi':

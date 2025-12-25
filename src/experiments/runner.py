@@ -103,6 +103,7 @@ def run(
     )
 
     threshold_lookup = get_threshold_lookup()
+    print(f"Thresholds: {threshold_lookup}")
 
     metrics = ["container_cpu_usage_seconds_total", "container_cpu_usage_seconds_total", "container_cpu_cfs_throttled_seconds_total", 
                 "container_memory_working_set_bytes"]

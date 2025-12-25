@@ -195,7 +195,7 @@ def parse_locust_output(output_string):
     return None
 
 
-def get_threshold_lookup(file="./threshold_lookup.pkl"):
+def get_threshold_lookup(file="./experiments/threshold_lookup.pkl"):
     if os.path.exists(file):
         with open(file, "rb") as f:
             threshold_lookup = pickle.load(f)
@@ -203,7 +203,7 @@ def get_threshold_lookup(file="./threshold_lookup.pkl"):
                 threshold_lookup[(node, metric)] = float(value)
         return threshold_lookup
     else:
-        return None
+        raise Exception("Threshold file does not exist")
 
 
 def wait_for_cooling(threshold_lookup, max_wait_seconds=600, exclude_server=False, exclude_nvme=False):
