@@ -206,7 +206,7 @@ def get_threshold_lookup(file="./threshold_lookup.pkl"):
         return None
 
 
-def wait_for_cooling(threshold_lookup, max_wait_seconds=600):
+def wait_for_cooling(threshold_lookup, max_wait_seconds=600, exclude_server=False, exclude_nvme=False):
     completed_node_metrics = []
     start_time  = time.time()
     while True:
@@ -225,11 +225,11 @@ def wait_for_cooling(threshold_lookup, max_wait_seconds=600):
 
         for result in results:
             node, _ , metrics = result
-            if node == "server":
+            if exclude_server and node == "server":
                 continue
             for metric, value in metrics.items():
                 metric = metric.replace("-", "_")
-                if metric in ["acpitz_acpi_0", "nvme_pci_0100", "nvme_pci_10100"]:      # Excluding
+                if exclude_nvme and metric in ["acpitz_acpi_0", "nvme_pci_0100", "nvme_pci_10100"]:      # Excluding
                     continue
                 if value <= threshold_lookup[(node, metric)]:
                     completed_node_metrics.append((node, metric))
