@@ -21,16 +21,17 @@ from environment_check import validate_environment_health_during_trial, get_pod_
 
 
 def get_resource_trials(trial_numbers=list(range(30)), 
-        trial_lengths=["10m"], trial_users=["50"]):
-        return [(trial_num, trial_length, trial_user) 
+        trial_lengths=["10m"], trial_users=["50"], trial_profiles=None):
+        return [(trial_num, trial_length, trial_user, trial_profile) 
             for trial_num in trial_numbers
             for trial_length in trial_lengths
-            for trial_user in trial_users]
+            for trial_user in trial_users
+            for trail_profile in trial_profiles]
 
 
 def make_resource_trial_file_name(trial, extension, prefix="trial"):
-    trial_num, trial_length, trial_workers = trial
-    return f"{prefix}-{trial_workers}-{trial_length}-{trial_num}{extension}"
+    trial_num, trial_length, trial_workers, trail_resource = trial
+    return f"{prefix}-{trial_workers:04d}-{trial_length}-{trial_num:04d}-{trail_resource}-{extension}"
 
 
 def get_next_resource_trial(
@@ -65,7 +66,7 @@ def run(
         bucket_name_prefix,
         trial_numbers = None,
         users = None,
-        resource_profile = "default",
+        resource_profiles = None,
         trial_lengths_minutes = None,
         microservices = None,
         replicas = 1,
@@ -91,8 +92,10 @@ def run(
         microservices = ["all"]
     if overrides is None:
         overrides = []
+    if resource_profiles is None:
+        resource_profiles = ["default"]
 
-    if overrides and resource_profile != "default":
+    if overrides and "default" in resource_profiles:
         raise RuntimeError("Cannot specify overrides and resource_profile at the same time")
         
     minio_client = Minio(
@@ -124,7 +127,8 @@ def run(
     trials = get_resource_trials(
             trial_numbers=trial_numbers,
             trial_lengths=[f"{length}m" for length in trial_lengths_minutes],
-            trial_users=[str(tu) for tu in users])
+            trial_users=[str(tu) for tu in users],
+            trial_profiles=[str(rp) for rp in resource_profiles])
 
     ssh.set_cpu_governor_to_performance(revert=True) ## Ensure we start in default state
     error_log_name = f"/tmp/error_log_{datetime.now().strftime('%Y%m%d%H%M%S')}.txt"
@@ -140,6 +144,7 @@ def run(
             metric_extensions):
         try:
             print(f"Starting trial: {trial}")
+            trial_num, trial_length, trial_users, resource_profile = trial
             print("Setting CPU governor to default mode")
             ssh.set_cpu_governor_to_performance(revert=True)
             if not skip_initialization:
@@ -289,10 +294,11 @@ def main():
     )
     
     parser.add_argument(
-        "--resource-profile",
+        "--resource-profiles",
         type=str,
-        default="default",
-        help="Resource profile to use (default: default)"
+        nargs="+",
+        default=None,
+        help="List of resource profiles to use (default: None)"
     )
     
     parser.add_argument(
@@ -379,7 +385,7 @@ def main():
         bucket_name_prefix=args.bucket_name_prefix,
         trial_numbers=args.trial_numbers,
         users=args.users,
-        resource_profile=args.resource_profile,
+        resource_profiles=args.resource_profiles,
         trial_lengths_minutes=args.trial_lengths_minutes,
         microservices=microservices,
         replicas=args.replicas,
