@@ -26,12 +26,12 @@ def get_resource_trials(trial_numbers=list(range(30)),
             for trial_num in trial_numbers
             for trial_length in trial_lengths
             for trial_user in trial_users
-            for trail_profile in trial_profiles]
+            for trial_profile in trial_profiles]
 
 
 def make_resource_trial_file_name(trial, extension, prefix="trial"):
     trial_num, trial_length, trial_workers, trail_resource = trial
-    return f"{prefix}-{trial_workers:04d}-{trial_length}-{trial_num:04d}-{trail_resource}-{extension}"
+    return f"{prefix}-{trial_workers}-{trial_length}-{trial_num}-{trail_resource}{extension}"
 
 
 def get_next_resource_trial(
@@ -183,9 +183,9 @@ def run(
             start_time_tz = datetime.now(tz=tz_object)
             print(f"Start time: {start_time.strftime("%Y-%m-%d %H:%M:%S")}")
 
-            trial_num, trial_length, trial_users = trial
+            trial_num, trial_length, trial_users, resource_profile = trial
 
-            log_db_filename = f"/tmp/trial_{trial_users}_{trial_length}_{trial_num}_{datetime.now().strftime('%Y%m%d%H%M%S')}.db"
+            log_db_filename = f"/tmp/trial_{trial_users}_{trial_length}_{trial_num}_{resource_profile}_{datetime.now().strftime('%Y%m%d%H%M%S')}.db"
             log_db_minio_filename = make_resource_trial_file_name(trial, log_extension)
             output_filename = "/tmp/output_log.txt"
             output_minio_filename = make_resource_trial_file_name(trial, ".txt", prefix="locust_output")
@@ -370,7 +370,7 @@ def main():
     print(f"Bucket Name Prefix: {args.bucket_name_prefix}")
     print(f"Trial Numbers: {args.trial_numbers}")
     print(f"Users: {args.users}")
-    print(f"Resource Profile: {args.resource_profile}")
+    print(f"Resource Profile: {args.resource_profiles}")
     print(f"Trial Lengths (minutes): {args.trial_lengths_minutes}")
     print(f"Microservices: {microservices}")
     print(f"Replicas: {args.replicas}")
