@@ -119,10 +119,13 @@ def run(
     node_bucket_name = f"{bucket_name_prefix}-node"
     log_bucket_name = bucket_names[0]
     metric_bucket_names = bucket_names[1:]
+    total_cpu_bucket_extension = "-total-cpu"
+    total_cpu_bucket_name = f"{bucket_name_prefix}{total_cpu_bucket_extension}"
 
     for bucket_name in bucket_names:
         ensure_bucket_exists(minio_client, bucket_name)
     ensure_bucket_exists(minio_client, node_bucket_name)
+    ensure_bucket_exists(minio_client, total_cpu_bucket_name)
 
     trials = get_resource_trials(
             trial_numbers=trial_numbers,
@@ -233,6 +236,15 @@ def run(
                 prometheus_data.to_parquet(filename)
                 minio_client.fput_object(metric_bucket_name, filename, filename)
                 os.remove(filename)
+            
+            # Execute custom query to store the total cpu (usage + throttled)
+            prom = prometheus.get_prometheus_connection()
+            prometheus_data = prometheus.get_prometheus_data_custom_query(prom, microservices, prometheus.get_total_cpu_demand, start_time, end_time)
+            total_cpu_filename = make_resource_trial_file_name(trial, f"{total_cpu_bucket_extension}.parquet")
+            prometheus_data.to_parquet(total_cpu_filename)
+            minio_client.fput_object(total_cpu_bucket_name, total_cpu_filename, total_cpu_filename)
+            os.remove(total_cpu_filename)
+
             if collect_thermal_metrics:
                 for node, node_metrics in NODE_METRICS.items():
                     for metric in node_metrics:

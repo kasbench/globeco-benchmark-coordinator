@@ -64,6 +64,46 @@ def get_prometheus_node_data(prom, node, metric_name, start_time, end_time,  nam
     return df
 
 
+def get_total_cpu_demand(pod_name, range='1m'):
+    """Get total CPU demand including throttled time"""
+    query = f'''
+    rate(container_cpu_usage_seconds_total{{pod="{pod_name}", image!=""}}[{range}]) 
+    + on(container, pod, namespace, instance)
+    rate(container_cpu_cfs_throttled_seconds_total{{pod="{pod_name}", image!=""}}[{range}])
+    '''
+    return query
+
+
+def get_prometheus_data_custom_query(prom, microservices, query_function, start_time, end_time, namespace="globeco", range="1m", steps="10s", verbose=False ):
+    if verbose:
+        print(f"Getting Prometheus data for {query_function} from {start_time} to {end_time}")
+    df = None
+    pods = []
+    for microservice in microservices:
+        deployment = Deployment.get(microservice, namespace=namespace)
+        pod = deployment.pods()[0]
+
+        query = query_function(pod_name=pod, range=range )    
+        if verbose:
+            print(query) 
+        
+        data = prom.custom_query_range(
+            query=query,
+            start_time=start_time,
+            end_time=end_time,
+            step=steps
+        )
+        if verbose:
+            print(f"Retrieved {len(data)} data points for {microservice} ({pod.name})")
+        temp_df = MetricRangeDataFrame(data)
+        temp_df['pod'] = microservice
+        if df is None:
+            df = temp_df
+        else:
+            df = pd.concat([df, temp_df], axis = 0)
+    print("Returning dataframe with shape:", df.shape)    
+    return df
+
 
 
 
