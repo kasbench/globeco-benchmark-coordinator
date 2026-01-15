@@ -365,185 +365,80 @@ def get_overrides_for_profile(resource_profile):
             {'globeco-trade-service': {'cpu_request': '1', 'cpu_limit': '1',
                                     'memory_request': '2Gi', 'memory_limit': '2Gi'}}
         ]
-    if resource_profile == "configuration-1":
-        return [
-             {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-execution-service": {"cpu_request": "346m", "cpu_limit": "346m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-             {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-order-generation-service": {"cpu_request": "989m", "cpu_limit": "989m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-             {"globeco-order-service": {"cpu_request": "750m", "cpu_limit": "750m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-             {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-portfolio-management-portal": {"cpu_request": "279m", "cpu_limit": "279m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-pricing-service": {"cpu_request": "515m", "cpu_limit": "515m", "memory_request": "400Mi", "memory_limit": "400Mi"}} ,
-             {"globeco-security-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-trade-service": {"cpu_request": "593m", "cpu_limit": "593m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-        ]
-    if resource_profile == "configuration-2":
-        return [
-             {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-execution-service": {"cpu_request": "416m", "cpu_limit": "416m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-             {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-             {"globeco-order-service": {"cpu_request": "900m", "cpu_limit": "900m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-             {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-portfolio-management-portal": {"cpu_request": "335m", "cpu_limit": "335m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-pricing-service": {"cpu_request": "618m", "cpu_limit": "618m", "memory_request": "400Mi", "memory_limit": "400Mi"}} ,
-             {"globeco-security-service": {"cpu_request": "228m", "cpu_limit": "228m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-trade-service": {"cpu_request": "712m", "cpu_limit": "712m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-        ]
-    if resource_profile == "configuration-3":
-        return [
-             {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-execution-service": {"cpu_request": "346m", "cpu_limit": "346m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-             {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-order-generation-service": {"cpu_request": "989m", "cpu_limit": "989m", "memory_request": "800Mi", "memory_limit": "800Mi"}} ,
-             {"globeco-order-service": {"cpu_request": "750m", "cpu_limit": "750m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-             {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-portfolio-management-portal": {"cpu_request": "279m", "cpu_limit": "279m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "300Mi", "memory_limit": "300Mi"}} ,
-             {"globeco-pricing-service": {"cpu_request": "515m", "cpu_limit": "515m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-             {"globeco-security-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-trade-service": {"cpu_request": "593m", "cpu_limit": "593m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-        ]
-    if resource_profile == "configuration-4":
-        return [
-             {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-execution-service": {"cpu_request": "416m", "cpu_limit": "416m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-             {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "800Mi", "memory_limit": "800Mi"}} ,
-             {"globeco-order-service": {"cpu_request": "900m", "cpu_limit": "900m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-             {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-portfolio-management-portal": {"cpu_request": "335m", "cpu_limit": "335m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "300Mi", "memory_limit": "300Mi"}} ,
-             {"globeco-pricing-service": {"cpu_request": "618m", "cpu_limit": "618m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-             {"globeco-security-service": {"cpu_request": "228m", "cpu_limit": "228m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-trade-service": {"cpu_request": "712m", "cpu_limit": "712m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-        ]
-    if resource_profile == "configuration-5":
-        return [
-             {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-execution-service": {"cpu_request": "378m", "cpu_limit": "378m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-             {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-             {"globeco-order-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-             {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-portfolio-management-portal": {"cpu_request": "305m", "cpu_limit": "305m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-pricing-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "400Mi", "memory_limit": "400Mi"}} ,
-             {"globeco-security-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-trade-service": {"cpu_request": "757m", "cpu_limit": "757m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-        ]
-    if resource_profile == "configuration-6":
-        return [
-             {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-execution-service": {"cpu_request": "416m", "cpu_limit": "416m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-             {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-             {"globeco-order-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-             {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-portfolio-management-portal": {"cpu_request": "335m", "cpu_limit": "335m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-pricing-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "400Mi", "memory_limit": "400Mi"}} ,
-             {"globeco-security-service": {"cpu_request": "212m", "cpu_limit": "212m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-trade-service": {"cpu_request": "833m", "cpu_limit": "833m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-        ]
-    if resource_profile == "configuration-7":
+    if resource_profile == "configuration-01":
         return [
              {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
              {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
              {"globeco-execution-service": {"cpu_request": "453m", "cpu_limit": "453m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
              {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
+             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "700Mi", "memory_limit": "700Mi"}} ,
              {"globeco-order-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-             {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-portfolio-management-portal": {"cpu_request": "366m", "cpu_limit": "366m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-pricing-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "400Mi", "memory_limit": "400Mi"}} ,
-             {"globeco-security-service": {"cpu_request": "231m", "cpu_limit": "231m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-trade-service": {"cpu_request": "908m", "cpu_limit": "908m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-        ]
-    if resource_profile == "configuration-8":
-        return [
-             {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-execution-service": {"cpu_request": "378m", "cpu_limit": "378m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-             {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "800Mi", "memory_limit": "800Mi"}} ,
-             {"globeco-order-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-             {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-portfolio-management-portal": {"cpu_request": "305m", "cpu_limit": "305m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "300Mi", "memory_limit": "300Mi"}} ,
-             {"globeco-pricing-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-             {"globeco-security-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-trade-service": {"cpu_request": "757m", "cpu_limit": "757m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-        ]
-    if resource_profile == "configuration-9":
-        return [
-             {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-execution-service": {"cpu_request": "416m", "cpu_limit": "416m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-             {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "800Mi", "memory_limit": "800Mi"}} ,
-             {"globeco-order-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-             {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-portfolio-management-portal": {"cpu_request": "335m", "cpu_limit": "335m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "300Mi", "memory_limit": "300Mi"}} ,
-             {"globeco-pricing-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-             {"globeco-security-service": {"cpu_request": "212m", "cpu_limit": "212m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-trade-service": {"cpu_request": "833m", "cpu_limit": "833m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-        ]
-    if resource_profile == "configuration-10":
-        return [
-             {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-execution-service": {"cpu_request": "453m", "cpu_limit": "453m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-             {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "800Mi", "memory_limit": "800Mi"}} ,
-             {"globeco-order-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
              {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
              {"globeco-portfolio-management-portal": {"cpu_request": "366m", "cpu_limit": "366m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
              {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "300Mi", "memory_limit": "300Mi"}} ,
              {"globeco-pricing-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
              {"globeco-security-service": {"cpu_request": "231m", "cpu_limit": "231m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-trade-service": {"cpu_request": "908m", "cpu_limit": "908m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
+             {"globeco-trade-service": {"cpu_request": "908m", "cpu_limit": "908m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
         ]
-    if resource_profile == "configuration-11":
+    if resource_profile == "configuration-02":
         return [
              {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
              {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
              {"globeco-execution-service": {"cpu_request": "491m", "cpu_limit": "491m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
              {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
+             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "700Mi", "memory_limit": "700Mi"}} ,
              {"globeco-order-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-             {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-portfolio-management-portal": {"cpu_request": "396m", "cpu_limit": "396m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-pricing-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "400Mi", "memory_limit": "400Mi"}} ,
-             {"globeco-security-service": {"cpu_request": "251m", "cpu_limit": "251m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-trade-service": {"cpu_request": "984m", "cpu_limit": "984m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
-        ]
-    if resource_profile == "configuration-12":
-        return [
-             {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-execution-service": {"cpu_request": "491m", "cpu_limit": "491m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
-             {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
-             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "800Mi", "memory_limit": "800Mi"}} ,
-             {"globeco-order-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
              {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
              {"globeco-portfolio-management-portal": {"cpu_request": "396m", "cpu_limit": "396m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
              {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "300Mi", "memory_limit": "300Mi"}} ,
              {"globeco-pricing-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
              {"globeco-security-service": {"cpu_request": "251m", "cpu_limit": "251m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
-             {"globeco-trade-service": {"cpu_request": "984m", "cpu_limit": "984m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
+             {"globeco-trade-service": {"cpu_request": "984m", "cpu_limit": "984m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
+        ]
+    if resource_profile == "configuration-03":
+        return [
+             {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
+             {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
+             {"globeco-execution-service": {"cpu_request": "529m", "cpu_limit": "529m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
+             {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
+             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "700Mi", "memory_limit": "700Mi"}} ,
+             {"globeco-order-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
+             {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
+             {"globeco-portfolio-management-portal": {"cpu_request": "427m", "cpu_limit": "427m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
+             {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "300Mi", "memory_limit": "300Mi"}} ,
+             {"globeco-pricing-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
+             {"globeco-security-service": {"cpu_request": "270m", "cpu_limit": "270m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
+             {"globeco-trade-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
+        ]
+    if resource_profile == "configuration-04":
+        return [
+             {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
+             {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
+             {"globeco-execution-service": {"cpu_request": "567m", "cpu_limit": "567m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
+             {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
+             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "700Mi", "memory_limit": "700Mi"}} ,
+             {"globeco-order-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
+             {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
+             {"globeco-portfolio-management-portal": {"cpu_request": "457m", "cpu_limit": "457m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
+             {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "300Mi", "memory_limit": "300Mi"}} ,
+             {"globeco-pricing-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
+             {"globeco-security-service": {"cpu_request": "289m", "cpu_limit": "289m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
+             {"globeco-trade-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
+        ]
+    if resource_profile == "configuration-05":
+        return [
+             {"globeco-allocation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
+             {"globeco-confirmation-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
+             {"globeco-execution-service": {"cpu_request": "605m", "cpu_limit": "605m", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
+             {"globeco-fix-engine": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
+             {"globeco-order-generation-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "700Mi", "memory_limit": "700Mi"}} ,
+             {"globeco-order-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
+             {"globeco-portfolio-accounting-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "100Mi", "memory_limit": "100Mi"}} ,
+             {"globeco-portfolio-management-portal": {"cpu_request": "488m", "cpu_limit": "488m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
+             {"globeco-portfolio-service": {"cpu_request": "200m", "cpu_limit": "200m", "memory_request": "300Mi", "memory_limit": "300Mi"}} ,
+             {"globeco-pricing-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
+             {"globeco-security-service": {"cpu_request": "308m", "cpu_limit": "308m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
+             {"globeco-trade-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "500Mi", "memory_limit": "500Mi"}} ,
         ]
     
     raise RuntimeError(f"Invalid resource profile: {resource_profile}")
