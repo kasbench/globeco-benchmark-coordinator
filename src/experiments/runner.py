@@ -231,7 +231,7 @@ def run(
 
             for metric, metric_bucket_name, metric_extension, calculate_rate in zip(metrics, metric_bucket_names, metric_extensions, calculate_rates):
                 prom = prometheus.get_prometheus_connection()
-                prometheus_data = prometheus.get_prometheus_data(prom, microservices, metric, start_time, end_time, calculate_rate=calculate_rate)
+                prometheus_data = prometheus.get_prometheus_data(prom, microservices, metric, start_time, end_time, range="30s", calculate_rate=calculate_rate)
                 filename = make_resource_trial_file_name(trial, metric_extension)
                 prometheus_data.to_parquet(filename)
                 minio_client.fput_object(metric_bucket_name, filename, filename)
