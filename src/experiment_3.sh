@@ -4,6 +4,6 @@
 --users 40 \
 --trial-numbers -60 \
 --host http://globeco.local:32080 \
---resource-profiles configuration-000 configuration-001 configuration-01 configuration-02 configuration-03   \
+--resource-profiles configuration-07 configuration-08 configuration-09 configuration-10 configuration-11   \
 --wait-for-cooling
 
