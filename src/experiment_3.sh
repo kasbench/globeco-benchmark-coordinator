@@ -4,9 +4,8 @@
 --users 40 \
 --trial-numbers -60 \
 --host http://globeco.local:32080 \
---resource-profiles configuration-10-00-True configuration-10-10-True configuration-10-20-True configuration-10-30-True \
-configuration-10-40-True configuration-10-50-True configuration-10-60-True  \
-configuration-10-40-False configuration-10-50-False configuration-10-60-False configuration-10-70-False \
-configuration-10-80-False \
+--resource-profiles configuration-10-40-False configuration-10-50-False \
+configuration-10-60-False configuration-10-70-False \
+configuration-10-80-False configuration-10-90-False configuration-10-100-False \
 --wait-for-cooling
 
