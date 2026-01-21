@@ -829,7 +829,7 @@ def get_overrides_for_profile(resource_profile):
              {"globeco-pricing-service": {"cpu_request": "957m", "cpu_limit": "957m", "memory_request": "600Mi", "memory_limit": "600Mi"}} ,
              {"globeco-security-service": {"cpu_request": "361m", "cpu_limit": "361m", "memory_request": "200Mi", "memory_limit": "200Mi"}} ,
              {"globeco-trade-service": {"cpu_request": "1", "cpu_limit": "1", "memory_request": "700Mi", "memory_limit": "700Mi"}} ,
-        ]v
+        ]
     raise RuntimeError(f"Invalid resource profile: {resource_profile}")
 
 def cpu_add(original_cpu, additional_cpu):
