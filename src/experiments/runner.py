@@ -21,12 +21,13 @@ from environment_check import validate_environment_health_during_trial, get_pod_
 
 
 def get_resource_trials(trial_numbers=list(range(30)), 
-        trial_lengths=["10m"], trial_users=["50"], trial_profiles=None):
-        return [(trial_num, trial_length, trial_user, trial_profile) 
+        trial_lengths=["10m"], trial_users=["50"], trial_profiles=None, trial_replicas=None):
+        return [(trial_num, trial_length, trial_user, trial_profile, trial_replica) 
             for trial_num in trial_numbers
             for trial_length in trial_lengths
             for trial_user in trial_users
-            for trial_profile in trial_profiles]
+            for trial_profile in trial_profiles
+            for trial_replica in trial_replicas]
 
 
 def make_resource_trial_file_name(trial, extension, prefix="trial"):
@@ -69,7 +70,7 @@ def run(
         resource_profiles = None,
         trial_lengths_minutes = None,
         microservices = None,
-        replicas = 1,
+        replicas = None,
         validate = True,
         verbose = False,
         overrides = None,
@@ -94,9 +95,10 @@ def run(
         overrides = []
     if resource_profiles is None:
         resource_profiles = ["default"]
-
     if overrides and "default" in resource_profiles:
         raise RuntimeError("Cannot specify overrides and resource_profile at the same time")
+    if replicas is None:
+        replicas = [1]
         
     minio_client = Minio(
         "minio:9000",  
@@ -131,7 +133,8 @@ def run(
             trial_numbers=trial_numbers,
             trial_lengths=[f"{length}m" for length in trial_lengths_minutes],
             trial_users=[str(tu) for tu in users],
-            trial_profiles=[str(rp) for rp in resource_profiles])
+            trial_profiles=[str(rp) for rp in resource_profiles],
+            trial_replicas = replicas)
 
     ssh.set_cpu_governor_to_performance(revert=True) ## Ensure we start in default state
     error_log_name = f"/tmp/error_log_{datetime.now().strftime('%Y%m%d%H%M%S')}.txt"
@@ -147,7 +150,7 @@ def run(
             metric_extensions):
         try:
             print(f"Starting trial: {trial}")
-            trial_num, trial_length, trial_users, resource_profile = trial
+            trial_num, trial_length, trial_users, resource_profile, trial_replica = trial
             print("Setting CPU governor to default mode")
             ssh.set_cpu_governor_to_performance(revert=True)
             if not skip_initialization:
@@ -156,7 +159,7 @@ def run(
                 print("Initializing databases")
                 initialize_databases()
                 print("Initializing environments for resource trial")
-                overrides = initialize_environments_for_resource_trial(replicas=replicas, overrides=overrides, resource_profile=resource_profile)
+                overrides = initialize_environments_for_resource_trial(replicas=trial_replica, overrides=overrides, resource_profile=resource_profile)
                 print("Environment Initialized.")
                 if validate:
                     print("Waiting for 15 seconds before validation...")
@@ -332,7 +335,8 @@ def main():
     parser.add_argument(
         "--replicas",
         type=int,
-        default=1,
+        nargs="+",
+        default=None,
         help="Number of replicas for each microservice (default: 1)"
     )
     
