@@ -15,7 +15,7 @@ from minio import Minio
 import ssh, prometheus
 from common import get_threshold_lookup, ensure_bucket_exists, scale_microservice_deployments, \
     initialize_databases, initialize_environments_for_resource_trial, validate_environments, wait_for_all_rollouts, \
-    wait_for_cooling, save_to_minio, file_exists, get_pod_conditions
+    wait_for_cooling, save_to_minio, file_exists, get_pod_conditions, get_roundtrip_trade_results
 from constants import NODE_METRICS
 from environment_check import validate_environment_health_during_trial, get_pod_restarts_for_namespace
 
@@ -116,11 +116,12 @@ def run(
     extensions = [".db", "-cpu-usage.parquet", "-cpu-usage-raw.parquet", "-cpu-throttled.parquet", "-memory-wsb.parquet"]
     log_extension = extensions[0]
     metric_extensions = extensions[1:]
-    bucket_extensions = ["-logs-raw", "-cpu-usage", "-cpu-usage-raw", "-cpu-throttled", "-memory-wsb"]
+    bucket_extensions = ["-logs-raw", "-roundrip", "-cpu-usage", "-cpu-usage-raw", "-cpu-throttled", "-memory-wsb"]
     bucket_names = [f"{bucket_name_prefix}{bucket_extension}" for bucket_extension in bucket_extensions]
     node_bucket_name = f"{bucket_name_prefix}-node"
     log_bucket_name = bucket_names[0]
-    metric_bucket_names = bucket_names[1:]
+    roundtrip_bucket_name = bucket_names[1]
+    metric_bucket_names = bucket_names[2:]
     total_cpu_bucket_extension = "-total-cpu"
     total_cpu_bucket_name = f"{bucket_name_prefix}{total_cpu_bucket_extension}"
 
@@ -231,7 +232,7 @@ def run(
             minio_client.fput_object(log_bucket_name, output_minio_filename, output_filename)
             os.remove(log_db_filename)
             os.remove(output_filename)
-
+            get_roundtrip_trade_results(roundtrip_bucket_name, trial)
             for metric, metric_bucket_name, metric_extension, calculate_rate in zip(metrics, metric_bucket_names, metric_extensions, calculate_rates):
                 prom = prometheus.get_prometheus_connection()
                 prometheus_data = prometheus.get_prometheus_data(prom, microservices, metric, start_time, end_time, range="1m", calculate_rate=calculate_rate)

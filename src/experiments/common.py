@@ -1209,4 +1209,24 @@ def get_pod_conditions(namespace="globeco", raise_exception_on_not_ready=True):
                 raise Exception(f"Pod {name} is not ready")
         results[name] = result
     return results
-        
+
+
+def get_roundtrip_trade_results(bucket_name, trial):
+    filename = make_trial_file_name(trial, "-roundrip.json")
+    command = 'kubectl exec svc/globeco-debug-tools -- psql -h globeco-trade-service-postgresql -U postgres -tAc "select json_agg(t) from (select sum(quantity_ordered) quantity_ordered, sum(quantity_placed) quantity_placed, sum(quantity_filled) quantity_filled from execution) t;"'
+    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    output = result.stdout.strip()
+    print(f"Roundtrip trade results: {output}")
+    if result.returncode != 0:
+        print(f"Error executing command: {result.stderr}")
+        raise RuntimeError(f"Command failed with return code {result.returncode}")  
+    if not output.startswith("[") or not output.endswith("]"):
+        raise ValueError(f"Unexpected output format: {output}")
+    # sample output: [{"quantity_ordered":30210.00000000,"quantity_placed":30210.00000000,"quantity_filled":30165.00000000}]
+    print(f"Saving {bucket_name}/{filename}")
+    with tempfile.NamedTemporaryFile(mode='w+', delete=True) as tmp:
+        tmp.write(output)
+        tmp.flush()
+        minio_client.fput_object(bucket_name, filename, tmp.name)
+
+    
