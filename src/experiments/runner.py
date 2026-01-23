@@ -189,9 +189,9 @@ def run(
             start_time_tz = datetime.now(tz=tz_object)
             print(f"Start time: {start_time.strftime("%Y-%m-%d %H:%M:%S")}")
 
-            trial_num, trial_length, trial_users, resource_profile = trial
+            trial_num, trial_length, trial_users, resource_profile, trial_replica = trial
 
-            log_db_filename = f"/tmp/trial_{trial_users}_{trial_length}_{trial_num}_{resource_profile}_{datetime.now().strftime('%Y%m%d%H%M%S')}.db"
+            log_db_filename = f"/tmp/trial_{trial_users}_{trial_length}_{trial_num}_{trial_replica}_{resource_profile}_{datetime.now().strftime('%Y%m%d%H%M%S')}.db"
             log_db_minio_filename = make_resource_trial_file_name(trial, log_extension)
             output_filename = "/tmp/output_log.txt"
             output_minio_filename = make_resource_trial_file_name(trial, ".txt", prefix="locust_output")
