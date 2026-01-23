@@ -232,7 +232,8 @@ def run(
             minio_client.fput_object(log_bucket_name, output_minio_filename, output_filename)
             os.remove(log_db_filename)
             os.remove(output_filename)
-            get_roundtrip_trade_results(roundtrip_bucket_name, trial)
+            rt_filename = make_resource_trial_file_name(trial, "-roundrip.json")
+            get_roundtrip_trade_results(roundtrip_bucket_name, trial, filename=rt_filename)
             for metric, metric_bucket_name, metric_extension, calculate_rate in zip(metrics, metric_bucket_names, metric_extensions, calculate_rates):
                 prom = prometheus.get_prometheus_connection()
                 prometheus_data = prometheus.get_prometheus_data(prom, microservices, metric, start_time, end_time, range="1m", calculate_rate=calculate_rate)

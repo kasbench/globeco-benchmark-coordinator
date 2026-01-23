@@ -1211,8 +1211,7 @@ def get_pod_conditions(namespace="globeco", raise_exception_on_not_ready=True):
     return results
 
 
-def get_roundtrip_trade_results(bucket_name, trial):
-    filename = make_resource_trial_file_name(trial, "-roundrip.json")
+def get_roundtrip_trade_results(bucket_name, trial, filename=None):
     command = 'kubectl exec svc/globeco-debug-tools -- psql -h globeco-trade-service-postgresql -U postgres -tAc "select json_agg(t) from (select sum(quantity_ordered) quantity_ordered, sum(quantity_placed) quantity_placed, sum(quantity_filled) quantity_filled from execution) t;"'
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     output = result.stdout.strip()
