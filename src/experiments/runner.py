@@ -31,8 +31,8 @@ def get_resource_trials(trial_numbers=list(range(30)),
 
 
 def make_resource_trial_file_name(trial, extension, prefix="trial"):
-    trial_num, trial_length, trial_workers, trail_resource = trial
-    return f"{prefix}-{trial_workers}-{trial_length}-{trial_num}-{trail_resource}{extension}"
+    trial_num, trial_length, trial_workers, trail_resource, trial_replica = trial
+    return f"{prefix}-{trial_workers}-{trial_length}-{trial_num}-{trial_replica}-{trail_resource}{extension}"
 
 
 def get_next_resource_trial(
