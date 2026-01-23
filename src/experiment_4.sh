@@ -1,5 +1,5 @@
 ./experiments/runner.py \
---bucket-name-prefix experiment-3-20260123 \
+--bucket-name-prefix experiment-4-20260123 \
 --trial-lengths-minutes 5 \
 --users 40 \
 --trial-numbers -60 \
