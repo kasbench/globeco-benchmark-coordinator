@@ -1,7 +1,7 @@
 ./experiments/runner.py \
 --bucket-name-prefix experiment-5-20260129 \
 --trial-lengths-minutes 5 \
---users 40 \
+--users 40 80\
 --trial-numbers -60 \
 --host http://globeco.local:32080 \
 --resource-profiles configuration-10-100-False configuration_nl-20-000-True configuration_nl-20-025-True \
